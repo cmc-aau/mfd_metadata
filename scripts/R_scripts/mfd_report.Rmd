@@ -1,0 +1,272 @@
+---
+title: "MFD project and subprojects report"
+author: "M. Albertsen & F. Delogu"
+date: "as.Date(now())"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    toc_collapsed: true
+params:
+  debug: false # Setting this to "true" will also knit the code to generate the report
+  debug2: false # Setting this to "true" will knit all the code, even to one omitted for aesthtic reason form the debug
+  internal: true # Setting this to "true" will generate the suggestions for further data retrieval
+---
+
+<style type="text/css">
+body, td {
+   font-size: 10pt;
+   text-align: justify
+}
+code.r{
+  font-size: 8pt;
+}
+pre {
+  font-size: 8pt
+}
+</style>
+
+# Setup
+
+```{r, echo=eval_debug, eval=params$debug, echo=params$debug2}
+knitr::asis_output("## Load libraries")
+```
+
+```{r, load libraries, message=F, warning=F, echo=params$debug}
+library(tidyverse)
+library(knitr)
+library(ghql)
+library(jsonlite)
+library(lubridate)
+library(mapDK)
+library(rgdal)
+library(sp)
+
+options(width = 500)
+```
+
+```{r, eval=params$debug, echo=params$debug2}
+asis_output("## Set the environment")
+```
+
+```{r, setup, echo=params$debug}
+options(stringsAsFactors = F, gsubfn.engine = "R")
+
+Sys.setenv("LANGUAGE"="En")
+
+wd <- getwd()
+
+eval_debug <- params$debug
+eval_debug2 <- params$debug2
+eval_internal <- params$internal
+```
+
+This section is meant for internal use and debugging, if you are interest in seeing the code please knit again the document setting the "debug" flag to "true". Optionally, set "debug2" as "true" to see also the code to generate the debug headings and text.
+
+For the generation of this document the parameters were set as:
+```{r, print params, echo=eval_debug}
+data.frame(param=c("debug", "debug2", "internal"), value=c(eval_debug, eval_debug2, eval_internal)) %>%
+  kable()
+```
+
+```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
+asis_output("## Custom functions")
+```
+
+```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
+asis_output("### Load functions")
+```
+
+```{r, load custom functions, message=F, warning=F, echo=eval_debug}
+source(paste0(wd, "/mfd_report_test_routine.R"))
+```
+
+```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
+asis_output("### Print functions")
+```
+
+```{r, print custom functions, message=F, echo=eval_debug, eval=eval_debug}
+methods(pstats)
+```
+
+```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
+asis_output("## Load data")
+```
+
+```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
+asis_output("### Download metadata from online Microflora Danica database
+
+This is the database that is linked to initial data-entry via the Microflora Danica App.")
+```
+
+```{r, get minimal metadata, echo=eval_debug}
+token <- Sys.getenv("GITHUB_GRAPHQL_TOKEN")
+
+con <- GraphqlClient$new(url = "https://mfd.programming.cool/graphql/",
+                         headers = list(Authorization = paste0("Bearer ", token)))
+
+qry <- Query$new()
+
+qry$query('fieldSamplesquery', 
+          '{fieldsamples {
+                barcode
+                type
+                gpslocation
+                habitattype
+                habitattypenumber
+                sitename
+                received
+                samplingcomment
+                project {id}}}')
+
+executedQuery <- con$exec(qry$queries$fieldSamplesquery)
+
+mfd_db0 <- executedQuery %>%
+  fromJSON(simplifyVector = TRUE, flatten = TRUE) %>%
+  as.data.frame()
+
+colnames(mfd_db0) <- c("fieldsample_barcode", "sample_type", "gps_location", "habitat_type",
+                      "habitat_typenumber", "sitename", "received",  
+                      "sampling_comment", "project_id")
+
+rm(con, qry, executedQuery, token)
+```
+
+```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
+asis_output("### Clean up general problems in the database metadata")
+```
+
+```{r, curate mfd df, echo=eval_debug}
+mfd_db <- mfd_db0 %>% 
+  mutate(received = dmy_hms(received, truncated = 3) %>% format("%Y-%m-%d")) %>%        # format dates
+  filter(str_detect(fieldsample_barcode, "^MFD")) %>%                                   # filter strange barcodes
+  filter(!str_detect(sampling_comment, "extraction neg") | is.na(sampling_comment)) %>% # remove ext negative
+  mutate(across(!c(fieldsample_barcode, project_id), ~tolower(as.character(.)))) %>%    # make all lowercase
+  mutate(across(habitat_typenumber, ~ toupper(.))) %>%                                  # format habitat number
+  mutate(across(habitat_typenumber, ~ str_replace_all(., "X", "0"))) %>%
+  mutate(across(habitat_typenumber, ~replace_na(., "0000"))) %>%
+  mutate(across(habitat_typenumber, ~ tolower(.))) %>%
+  separate(gps_location, into = c("latitude", "longitude"), sep = ",") %>%              # split gps
+  mutate(latitude = as.numeric(latitude),
+         longitude = as.numeric(longitude)) %>%
+  mutate(mfd_sampletype = NA,                                                           # Add classifications
+         mfd_areatype   = NA,
+         mfd_hab1       = NA,
+         mfd_hab2       = NA,
+         mfd_hab3       = NA,
+         sampling_date  = NA)
+
+rm(mfd_db0)
+```
+
+```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
+asis_output("### Format mfd dataframe")
+```
+
+```{r, format mfd df, echo=eval_debug}
+mfd_projects <- tibble(project_id = unique(mfd_db$project_id) %>% sort(), 
+                       description = NA,
+                       extended_metadata = NA,
+                       people = NA,
+                       responsible = NA,
+                       comment = NA)
+```
+
+```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
+asis_output("### Load the map of Denmark")
+```
+
+```{r, load DK map, warning=F, message=F, echo=eval_debug}
+
+if(!file.exists(paste0(wd, "/../../data/downloads/DK_regions.geojson"))){
+  url = "https://api.dataforsyningen.dk/landsdele?format=geojson"
+  geofile = tempfile()
+  download.file(url, geofile)
+  regions <- rgdal::readOGR(geofile)
+  rgdal::writeOGR(regions, paste0(wd, "/../../data/downloads/DK_regions.geojson"), layer="file76fc3f3c3b00", driver="GeoJSON")
+} else {
+  regions <- rgdal::readOGR(paste0(wd, "/../../data/downloads/DK_regions.geojson"))
+}
+
+```
+
+# Project specific curation
+
+## P01_1: Biowide - Original
+
+### Description
+```{r, P01_1, echo=eval_debug}
+pid <- "P01_1"
+des <- "Biowide (Biodiversity in Width and Depth). In light of the biodiversity crisis and our limited ability to explain variation in biodiversity, tools to quantify spatial and temporal variation in biodiversity and its underlying drivers are critically needed. Inspired by the recently published ecospace framework, we developed and tested a sampling design for environmental and biotic mapping. We selected 130 study sites (40×40 m) across Denmark using stratified random sampling along the major environmental gradients underlying biotic variation. Using standardized methods, we collected site species data on vascular plants, bryophytes, macrofungi, lichens, gastropods and arthropods. To evaluate sampling efficiency, we calculated regional coverage (relative to the known species number per taxonomic group), and site scale coverage (i.e., sample completeness per taxonomic group at each site). To extend taxonomic coverage to organisms that are difficult to sample by classical inventories (e.g., nematodes and non-fruiting fungi), we collected soil for metabarcoding. Finally, to assess site conditions, we mapped abiotic conditions, biotic resources and habitat continuity. The main paper is described here: https://bmcecol.biomedcentral.com/articles/10.1186/s12898-019-0260-x. See a list of related publications here: https://ecos.au.dk/forskningraadgivning/temasider/publikationer."
+ext <- "Environmental parameters; alternative habitat classifications; plant counts; animal counts; fungal counts; ITS2 amplicons; trnL amplicons."
+peo <- "Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>; Rasmus Ejrnæs <rasmus@bios.au.dk>"
+res <- "Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
+com <- ""
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, des, ext, peo, res, com)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid & habitat_type == "natural_soil", "Natural", mfd_areatype),
+         mfd_areatype       = ifelse(project_id == pid & habitat_type == "agriculture", "Agriculture", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "agriculture", "6000", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path=paste0(wd, "/../../data/ontology/2022-11-28_mfd-habitat-ontology.xlsx"))
+```
+`r pid`: `r des`
+
+### Info
+**Extended metadata:** `r ext`
+
+**People:** `r peo`
+
+**Responsible:** `r res``
+
+**Comments:** `r com``
+
+### Data 
+
+The samples from the `r pid` project were collected in the following locations:
+```{r, echo=eval_debug}
+pstats(project = pid)
+```
+
+The samples from the `r pid` project were collected in the following locations:
+```{r, echo=eval_debug}
+tstats(project = pid)
+```
+
+The samples from the `r pid` project were collected in the following locations:
+```{r, echo=eval_debug}
+hstats(project = pid)
+```
+
+```{r, echo=eval_debug, eval=eval_internal}
+asis_output("### Missing data
+
+The following data are missing, for which a mitigation strategy is suggested:")
+```
+
+```{r, echo=eval_debug, eval=eval_internal}
+missing_info(project = pid)
+```
+
+```{r, echo=eval_debug}
+out_of_map <- coords_out(project = pid)
+
+if(out_of_map){
+  asis_output("### Dubious location
+
+The following samples were reported from coordinates outside of Danish land:")
+  print(out_of_map)
+} else {
+  asis_output("### Dubious location
+
+No samples were reported from coordinates outside of Danish land.")
+}
+```
+
+```{r, echo=eval_debug}
+rm(pid, des, ext, peo, res, com)
+```
