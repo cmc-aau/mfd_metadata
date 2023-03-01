@@ -1,11 +1,31 @@
+#####
+# Full testing routine for the mfd subprojects
+#####
+
+###
+# Util functions
+###
+
+# Subset to mfd database fro a single subproject
+mfd_subset <- function(project=NA, data_table=mfd_db){
+  data_table <- data_table %>%
+    filter(project_id == project)
+  
+  return(data_table)
+}
+
+# Source blocks of functions by theme
+source(paste0(wd, "/ooe_functions.R"))
+source(paste0(wd, "/coords_functions.R"))
+
+
 ## Functions for individual project stats
 
 ### Plot samples on the map of Denmark
-pstats <- function(project = NA, data = mfd_db){
+pstats <- function(data_table = NA){
   
-  temp <- data %>% filter(project_id %in% project)
   out <- mapDK(detail = 'region', map.colour = "grey50", map.fill = "grey95") +
-    geom_point(data = temp, 
+    geom_point(data = data_table, 
                aes(x = longitude, y = latitude, group = NA), size = 1, alpha = 0.5) +
     theme(legend.position = c(0.8,0.8))
   
@@ -54,7 +74,7 @@ add_ontology <- function(data = NA, ontology_path){
   mfd_ontology <- readxl::read_excel(ontology_path)
   
   test1 <- data %>%
-    select(-mfd_hab1, -mfd_hab2, -mfd_hab3) %>%
+    dplyr::select(-mfd_hab1, -mfd_hab2, -mfd_hab3) %>%
     mutate(mfd_h1u = paste0(mfd_sampletype, mfd_areatype, paste0(str_sub(habitat_typenumber, 1,1),"000")),
            mfd_h2u = paste0(mfd_sampletype, mfd_areatype, paste0(str_sub(habitat_typenumber, 1,2),"00")),
            mfd_h3u = paste0(mfd_sampletype, mfd_areatype, habitat_typenumber))
@@ -74,7 +94,7 @@ add_ontology <- function(data = NA, ontology_path){
   test2 <- test1 %>% left_join(mfd_hab1 %>% select(mfd_h1u, mfd_hab1), by = "mfd_h1u") %>%
     left_join(mfd_hab2 %>% select(mfd_h2u, mfd_hab2), by = "mfd_h2u") %>%
     left_join(mfd_hab3 %>% select(mfd_h3u, mfd_hab3), by = "mfd_h3u") %>%
-    select(-mfd_h1u, -mfd_h2u, -mfd_h3u)
+    dplyr::select(-mfd_h1u, -mfd_h2u, -mfd_h3u)
   
   return(test2)    
 }
@@ -94,50 +114,44 @@ missing_info <- function(project = NA, prj_table = mfd_projects){
 }
 
 ### Find missing metadata
-missing_metadata <- function(project = NA, data_table = mfd_db){
+missing_metadata <- function(project=NA, data_table=mfd_db){
   dd <- data_table %>%
     filter(project_id==project) %>%
-    summarise_all(funs(sum(is.na(.))))
-  mitigation.table <- data.frame(info=colnames(dd), current=t(dd))
-  return(dd)
-}
-
-### Find coords out of map
-#   Solution from https://datawanderings.com/2018/09/01/r-point-in-polygon-a-mathematical-cookie-cutter/ and https://www.linkedin.com/pulse/easy-maps-denmark-r-mikkel-freltoft-krogsholm/ using the regional map of Denmark from https://dawadocs.dataforsyningen.dk/
-
-#url = "https://api.dataforsyningen.dk/landsdele?format=geojson"
-#geofile = tempfile()
-#download.file(url, geofile)
-#regions <- rgdal::readOGR(geofile)# %>%
-
-coords_out <- function(project = NA, regions_map = regions, data_table = mfd_db, id = "fieldsample_barcode", lat="latitude", lon="longitude"){
-  dd <- data_table %>%
-    filter(project_id==project) %>%
-    select(all_of(c(id, lat, lon)))
-  
-  #dd <- rbind(dd, data.frame(fieldsample_barcode="MFDXXXX", latitude=40.5389, longitude=14.9729)) # Testing
-  
-  coordinates(dd) <- c(lon, lat)
-  proj4string(dd) <- CRS("+proj=longlat +datum=WGS84")
-  proj4string(dd) <- proj4string(regions_map)
-  pointsinpoly <- over(dd, regions_map)
-  to_return <- dd$fieldsample_barcode[is.na(pointsinpoly$navn)]
-  
-  if(length(to_return>0)){
-    return(to_return)
+    filter(if_any(everything(.), is.na))
+  if(nrow(dd)>0){
+    return(dd) 
   } else {
     return(F)
   }
+}
+
+summarise_missing_metadata <- function(data_table = NA){
+  dd <- data_table %>%
+    summarise_all(funs(sum(is.na(.))))
+  if(sum(dd)>0){
+    return(dd)
+  } else {
+  #mitigation.table <- data.frame(info=colnames(dd), current=t(dd))
+    return(F)
+  }
+}
+
+summarise_metadata <- function(data_table = NA){
+  N <- nrow(data_table)
+  dd <- data_table %>%
+    summarise_all(funs(sum(!is.na(.)))) %>%
+    pivot_longer(cols=everything(), names_to="field", values_to="present") %>%
+    mutate(`present [%]`=present/N*100, missing=N-present, `missing [%]`=missing/N*100)
+  return(dd)
+}
+
+full_check <- function(project = NA, data_table = NA, missing_meta = NA, regions = NA){ # you can use cat
+  
+  cat(ooe_text(project = project, data_table = data_table),
+  
+  missing_coords_text(data_table = data_table, missing_meta = missing_meta),
+  
+  out_coords_text(data_table = data_table, regions = regions, missing_meta = missing_meta),
+  sep="\n")
   
 }
-
-### Find metadata out of expectations
-sample_type.accepted <- c("biofilm", "sandfilter", "sediment", "sludge", "soil", "water", "water(dilute)") # List of accepted values "sample_type" variable
-habitat_type.accepted <- c("agriculture", "built_environment", "city_other", "city_parks", "city_pond", "coast", "drinking_water", "fjords", "groundwater", "harbour", "lakes", "marine", "natural_soil", "polluted_soil", "rainwater_city", "rainwater_highway", "streams", "subterranean", "wastewater") # List of accepted values "habitat_type" variable
-
-ooe_metadata <- function(project = NA, data_table = mfd_db){
-  dd <- data_table %>%
-    filter(project_id==project) %>%
-    return(dd)
-}
-

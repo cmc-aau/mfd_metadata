@@ -137,8 +137,8 @@ rm(con, qry, executedQuery, token)
 asis_output("### Clean up general problems in the database metadata")
 ```
 
-```{r, curate mfd df, echo=eval_debug}
-mfd_db <- mfd_db0 %>% 
+```{r, curate mfd project, echo=eval_debug}
+mfd_db <- mfd_db0 %>%
   mutate(received = dmy_hms(received, truncated = 3) %>% format("%Y-%m-%d")) %>%        # format dates
   filter(str_detect(fieldsample_barcode, "^MFD")) %>%                                   # filter strange barcodes
   filter(!str_detect(sampling_comment, "extraction neg") | is.na(sampling_comment)) %>% # remove ext negative
@@ -164,7 +164,7 @@ rm(mfd_db0)
 asis_output("### Format mfd dataframe")
 ```
 
-```{r, format mfd df, echo=eval_debug}
+```{r, format mfd projects, echo=eval_debug}
 mfd_projects <- tibble(project_id = unique(mfd_db$project_id) %>% sort(), 
                        description = NA,
                        extended_metadata = NA,
@@ -211,8 +211,13 @@ mfd_db <- mfd_db %>%
          mfd_areatype       = ifelse(project_id == pid & habitat_type == "agriculture", "Agriculture", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
          habitat_typenumber = ifelse(project_id == pid & habitat_type == "agriculture", "6000", habitat_typenumber),
-         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date),
+         sampling_comment   = ifelse(project_id == pid & sampling_comment == "", NA, sampling_comment)) %>%
   add_ontology(ontology_path=paste0(wd, "/../../data/ontology/2022-11-28_mfd-habitat-ontology.xlsx"))
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
 ```
 `r pid`: `r des`
 
@@ -229,17 +234,17 @@ mfd_db <- mfd_db %>%
 
 The samples from the `r pid` project were collected in the following locations:
 ```{r, echo=eval_debug}
-pstats(project = pid)
+samples_on_map(data_table = mfd_db_subproject)
 ```
 
 The samples from the `r pid` project were collected in the following locations:
 ```{r, echo=eval_debug}
-tstats(project = pid)
+tstats(project = pid, data = mfd_db_subproject)
 ```
 
 The samples from the `r pid` project were collected in the following locations:
 ```{r, echo=eval_debug}
-hstats(project = pid)
+hstats(project = pid, data = mfd_db_subproject)
 ```
 
 ```{r, echo=eval_debug, eval=eval_internal}
@@ -252,21 +257,32 @@ The following data are missing, for which a mitigation strategy is suggested:")
 missing_info(project = pid)
 ```
 
-```{r, echo=eval_debug}
-out_of_map <- coords_out(project = pid)
+### Metadata summary
 
-if(out_of_map){
-  asis_output("### Dubious location
+```{r, warning=F, echo=eval_debug, eval=T}
 
-The following samples were reported from coordinates outside of Danish land:")
-  print(out_of_map)
-} else {
-  asis_output("### Dubious location
+summarise_metadata(data_table = mfd_db_subproject) %>%
+  kable(align="r", digits=2)
 
-No samples were reported from coordinates outside of Danish land.")
-}
+```
+
+```{r, echo=eval_debug, eval=eval_internal}
+missing_meta <- missing_metadata(project = pid, data_table = mfd_db_subproject)
+
+ooe_text(data_table = mfd_db_subproject)
+  
+samples_missing_coords <- missing_coords(missing_meta = missing_meta)
+
+out_coords_text(data_table = mfd_db_subproject, regions = regions, missing_meta = missing_meta)
+
+```
+
+```{r, warning=F, echo=eval_debug, eval=T}
+
+samples_on_map(data_table = mfd_db_subproject, samples_out = coords_out(regions_map = regions, data_table = mfd_db_subproject))
+
 ```
 
 ```{r, echo=eval_debug}
-rm(pid, des, ext, peo, res, com)
+rm(pid, des, ext, peo, res, com, mfd_db_subproject, N)
 ```
