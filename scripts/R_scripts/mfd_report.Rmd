@@ -2,16 +2,19 @@
 title: "MFD project and subprojects report"
 author: "M. Albertsen & F. Delogu"
 date: "as.Date(now())"
-output: 
+output:
   html_document:
-    toc: true
+    toc: yes
     toc_depth: 2
-    toc_float: true
-    toc_collapsed: true
+    toc_float: yes
+    toc_collapsed: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
 params:
-  debug: false # Setting this to "true" will also knit the code to generate the report
-  debug2: false # Setting this to "true" will knit all the code, even to one omitted for aesthtic reason form the debug
-  internal: true # Setting this to "true" will generate the suggestions for further data retrieval
+  debug: yes
+  debug2: yes
+  internal: yes
 ---
 
 <style type="text/css">
@@ -29,11 +32,8 @@ pre {
 
 # Setup
 
-```{r, echo=eval_debug, eval=params$debug, echo=params$debug2}
-knitr::asis_output("## Load libraries")
-```
-
-```{r, load libraries, message=F, warning=F, echo=params$debug}
+## Load libraries
+```{r load libraries, message=F, warning=F, echo=params$debug}
 library(tidyverse)
 library(knitr)
 library(ghql)
@@ -46,16 +46,26 @@ library(sp)
 options(width = 500)
 ```
 
-```{r, eval=params$debug, echo=params$debug2}
-asis_output("## Set the environment")
-```
-
-```{r, setup, echo=params$debug}
+## Set the environment
+```{r setup, echo=params$debug}
 options(stringsAsFactors = F, gsubfn.engine = "R")
 
 Sys.setenv("LANGUAGE"="En")
 
 wd <- getwd()
+
+ontology.path <- paste0(wd, '/../../data/ontology/2022-11-28_mfd-habitat-ontology.xlsx')
+downloads.path <- paste0(wd, '/../../data/downloads')
+metadata.path <- paste0(wd, '/../../data/metadata')
+
+mfd_projects.path <- paste0(wd, '/../../data/results/mfd_projects.xlsx')
+minimal_indices_explanation <- paste0(metadata.path, '/general/minimal_metadata_descriptors.xlsx')
+reformat.metadata.path <- paste0(wd, '/../../analysis/metadata')
+mails_01.path <- paste0(wd, '/../../analysis/mails_01')
+
+minimal_indices <- c("fieldsample_barcode", "sample_type", "sampling_date",
+                     "latitude", "longitude",  "habitat_type", "habitat_typenumber", "sitename",
+                     "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3") # NA # It is interpreted as all
 
 eval_debug <- params$debug
 eval_debug2 <- params$debug2
@@ -65,42 +75,36 @@ eval_internal <- params$internal
 This section is meant for internal use and debugging, if you are interest in seeing the code please knit again the document setting the "debug" flag to "true". Optionally, set "debug2" as "true" to see also the code to generate the debug headings and text.
 
 For the generation of this document the parameters were set as:
-```{r, print params, echo=eval_debug}
+```{r print params, echo=eval_debug}
 data.frame(param=c("debug", "debug2", "internal"), value=c(eval_debug, eval_debug2, eval_internal)) %>%
   kable()
 ```
 
-```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
-asis_output("## Custom functions")
-```
+## Custom functions
 
-```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
-asis_output("### Load functions")
-```
-
-```{r, load custom functions, message=F, warning=F, echo=eval_debug}
+### Load functions
+```{r load custom functions, message=F, warning=F, echo=eval_debug}
 source(paste0(wd, "/mfd_report_test_routine.R"))
 ```
 
-```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
-asis_output("### Print functions")
-```
-
-```{r, print custom functions, message=F, echo=eval_debug, eval=eval_debug}
+### Print functions
+```{r print custom functions, message=F, echo=eval_debug, eval=eval_debug}
 methods(pstats)
 ```
 
-```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
-asis_output("## Load data")
+## Load data
+
+### Load MFD projects summary
+```{r load project summary}
+#mfd_projects <- readxl::read_excel(mfd_projects.path)
+#mfd_project.name_conversion <- c("pid", "pnm", "des", "ext", "peo", "res", "com", "metadata_map_location")
+#names(mfd_project.name_conversion) <- c("project_id",	"project_name",	"project_description",	"extended_description",	"people",	"responsible",	"comment",	"metadata_map_location")
+
 ```
 
-```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
-asis_output("### Download metadata from online Microflora Danica database
-
-This is the database that is linked to initial data-entry via the Microflora Danica App.")
-```
-
-```{r, get minimal metadata, echo=eval_debug}
+### Download metadata from online Microflora Danica database
+This is the database that is linked to initial data-entry via the Microflora Danica App.
+```{r get minimal metadata, echo=eval_debug}
 token <- Sys.getenv("GITHUB_GRAPHQL_TOKEN")
 
 con <- GraphqlClient$new(url = "https://mfd.programming.cool/graphql/",
@@ -133,11 +137,8 @@ colnames(mfd_db0) <- c("fieldsample_barcode", "sample_type", "gps_location", "ha
 rm(con, qry, executedQuery, token)
 ```
 
-```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
-asis_output("### Clean up general problems in the database metadata")
-```
-
-```{r, curate mfd project, echo=eval_debug}
+### Clean up general problems in the database metadata
+```{r curate mfd project, echo=eval_debug}
 mfd_db <- mfd_db0 %>%
   mutate(received = dmy_hms(received, truncated = 3) %>% format("%Y-%m-%d")) %>%        # format dates
   filter(str_detect(fieldsample_barcode, "^MFD")) %>%                                   # filter strange barcodes
@@ -145,8 +146,8 @@ mfd_db <- mfd_db0 %>%
   mutate(across(!c(fieldsample_barcode, project_id), ~tolower(as.character(.)))) %>%    # make all lowercase
   mutate(across(habitat_typenumber, ~ toupper(.))) %>%                                  # format habitat number
   mutate(across(habitat_typenumber, ~ str_replace_all(., "X", "0"))) %>%
-  mutate(across(habitat_typenumber, ~replace_na(., "0000"))) %>%
-  mutate(across(habitat_typenumber, ~ tolower(.))) %>%
+  #mutate(across(habitat_typenumber, ~replace_na(., "0000"))) %>%
+  #mutate(across(habitat_typenumber, ~ tolower(.))) %>%
   separate(gps_location, into = c("latitude", "longitude"), sep = ",") %>%              # split gps
   mutate(latitude = as.numeric(latitude),
          longitude = as.numeric(longitude)) %>%
@@ -160,129 +161,1394 @@ mfd_db <- mfd_db0 %>%
 rm(mfd_db0)
 ```
 
-```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
-asis_output("### Format mfd dataframe")
-```
-
-```{r, format mfd projects, echo=eval_debug}
+### Format mfd dataframe
+```{r format mfd projects, echo=eval_debug}
 mfd_projects <- tibble(project_id = unique(mfd_db$project_id) %>% sort(), 
+                       project_name = NA,
                        description = NA,
                        extended_metadata = NA,
                        people = NA,
                        responsible = NA,
-                       comment = NA)
+                       comment = NA,
+                       metadata_map = NA)
 ```
 
-```{r, echo=eval_debug, eval=eval_debug, echo=eval_debug2}
-asis_output("### Load the map of Denmark")
+### Load the map of Denmark
+```{r load DK map, message=F, warning=F, error=F, echo=eval_debug}
+#if(!file.exists(paste0(downloads.path,"/DK_regions.geojson"))){
+#  url = "https://api.dataforsyningen.dk/landsdele?format=geojson"
+#  geofile = tempfile()
+#  download.file(url, geofile)
+#  regions <- rgdal::readOGR(geofile)
+#  rgdal::writeOGR(regions, paste0(downloads.pathh, "/DK_regions.geojson"), layer="file76fc3f3c3b00", driver="GeoJSON")
+#} else {
+#  regions <- rgdal::readOGR(paste0(downloads.path, "/DK_regions.geojson"))
+#}
 ```
 
-```{r, load DK map, warning=F, message=F, echo=eval_debug}
-
-if(!file.exists(paste0(wd, "/../../data/downloads/DK_regions.geojson"))){
-  url = "https://api.dataforsyningen.dk/landsdele?format=geojson"
-  geofile = tempfile()
-  download.file(url, geofile)
-  regions <- rgdal::readOGR(geofile)
-  rgdal::writeOGR(regions, paste0(wd, "/../../data/downloads/DK_regions.geojson"), layer="file76fc3f3c3b00", driver="GeoJSON")
-} else {
-  regions <- rgdal::readOGR(paste0(wd, "/../../data/downloads/DK_regions.geojson"))
-}
-
-```
-
-# Project specific curation
+# Subproject curation
 
 ## P01_1: Biowide - Original
+```{r P01_1, echo=F, message=F, warning=F, error=F, results='asis'}
+#project_array <- (mfd_projects %>%
+#                    filter(project_id=="P01_1"))
 
-### Description
-```{r, P01_1, echo=eval_debug}
+#for(var.name in names(project_array)){
+#  assign(mfd_project.name_conversion[var.name], project_array[var.name])
+#}
+
 pid <- "P01_1"
+pnm <- "Biowide - Original"
 des <- "Biowide (Biodiversity in Width and Depth). In light of the biodiversity crisis and our limited ability to explain variation in biodiversity, tools to quantify spatial and temporal variation in biodiversity and its underlying drivers are critically needed. Inspired by the recently published ecospace framework, we developed and tested a sampling design for environmental and biotic mapping. We selected 130 study sites (40×40 m) across Denmark using stratified random sampling along the major environmental gradients underlying biotic variation. Using standardized methods, we collected site species data on vascular plants, bryophytes, macrofungi, lichens, gastropods and arthropods. To evaluate sampling efficiency, we calculated regional coverage (relative to the known species number per taxonomic group), and site scale coverage (i.e., sample completeness per taxonomic group at each site). To extend taxonomic coverage to organisms that are difficult to sample by classical inventories (e.g., nematodes and non-fruiting fungi), we collected soil for metabarcoding. Finally, to assess site conditions, we mapped abiotic conditions, biotic resources and habitat continuity. The main paper is described here: https://bmcecol.biomedcentral.com/articles/10.1186/s12898-019-0260-x. See a list of related publications here: https://ecos.au.dk/forskningraadgivning/temasider/publikationer."
 ext <- "Environmental parameters; alternative habitat classifications; plant counts; animal counts; fungal counts; ITS2 amplicons; trnL amplicons."
-peo <- "Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>; Rasmus Ejrnæs <rasmus@bios.au.dk>"
+peo <- "Tobias Guldberg Frøslev <tobiasgf@sund.ku.dk>; Rasmus Ejrnæs <rasmus@bios.au.dk>"
 res <- "Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
 com <- ""
 
-mfd_projects[mfd_projects$project_id == pid,] <- list(pid, des, ext, peo, res, com)
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+mapping.project <- readxl::read_xlsx(paste0(metadata.path, "/", pid, "/MFDP005_metadata_32.xlsx")) %>%
+  filter(!is.na(sample_id)) %>%
+  select(sample_name, sample_id) %>%
+  as.data.frame()
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
 
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid & habitat_type == "natural_soil", "Natural", mfd_areatype),
          mfd_areatype       = ifelse(project_id == pid & habitat_type == "agriculture", "Agriculture", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
-         habitat_typenumber = ifelse(project_id == pid & habitat_type == "agriculture", "6000", habitat_typenumber),
+         #habitat_typenumber = ifelse(project_id == pid & habitat_type == "agriculture", "6000", habitat_typenumber),
          sampling_date      = ifelse(project_id == pid, NA, sampling_date),
          sampling_comment   = ifelse(project_id == pid & sampling_comment == "", NA, sampling_comment)) %>%
-  add_ontology(ontology_path=paste0(wd, "/../../data/ontology/2022-11-28_mfd-habitat-ontology.xlsx"))
+  add_ontology(ontology_path = ontology.path)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
 
-```
-`r pid`: `r des`
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
 
-### Info
-**Extended metadata:** `r ext`
-
-**People:** `r peo`
-
-**Responsible:** `r res``
-
-**Comments:** `r com``
-
-### Data 
-
-The samples from the `r pid` project were collected in the following locations:
-```{r, echo=eval_debug}
-samples_on_map(data_table = mfd_db_subproject)
-```
-
-The samples from the `r pid` project were collected in the following locations:
-```{r, echo=eval_debug}
-tstats(project = pid, data = mfd_db_subproject)
-```
-
-The samples from the `r pid` project were collected in the following locations:
-```{r, echo=eval_debug}
-hstats(project = pid, data = mfd_db_subproject)
-```
-
-```{r, echo=eval_debug, eval=eval_internal}
-asis_output("### Missing data
-
-The following data are missing, for which a mitigation strategy is suggested:")
-```
-
-```{r, echo=eval_debug, eval=eval_internal}
-missing_info(project = pid)
-```
-
-### Metadata summary
-
-```{r, warning=F, echo=eval_debug, eval=T}
-
-summarise_metadata(data_table = mfd_db_subproject) %>%
-  kable(align="r", digits=2)
 
 ```
 
-```{r, echo=eval_debug, eval=eval_internal}
-missing_meta <- missing_metadata(project = pid, data_table = mfd_db_subproject)
+## P01_2: Biowide - River valleys
+```{r P01_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P01_2"
+pnm <- "Biowide - River valleys"
+des <- "Biowide extension with samples from river valleys"
+ext <- "Environmental parameters; alternative habitat classifications; plant counts; animal counts; fungal counts"
+peo <- "Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>; Rasmus Ejrnæs <rasmus@bios.au.dk>"
+res <- "Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
+com <- ""
 
-ooe_text(data_table = mfd_db_subproject)
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+date_correction <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P01_2_MFD metadata_32.xlsx")) %>%
+  select(fieldsample_barcode = sample_id, correct_date = Sampling_date) %>%
+  mutate(correct_date = dmy(correct_date) %>% format("%Y-%m-%d"))
+
+mapping.project <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P01_2_MFD metadata_32.xlsx")) %>%
+  filter(!is.na(sample_id)) %>%
+  select(sample_name, sample_id) %>%
+  as.data.frame()
+
+mfd_db <- mfd_db %>%
+  left_join(date_correction, by = "fieldsample_barcode") %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         sampling_date      = ifelse(project_id == pid, correct_date, sampling_date),
+         sampling_date      = ifelse(fieldsample_barcode == "MFD00449", "2018-08-01", sampling_date)) %>% #Assuming its taken at same time..
+  select(-correct_date) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+
+
+```
+
+## P02_1: Biowide - Ecospace
+```{r P02_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P02_1"
+pnm <- "Biowide - Ecospace"
+des <- "Biowide Ecospace. Not sure what the aim of this study was."
+ext <- "Environmental parameters; alternative habitat classifications; plant counts; animal counts; fungal counts"
+peo <- "Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>; Rasmus Ejrnæs <rasmus@bios.au.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+data_correction <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P02_1_MFD metadata_32.xlsx")) %>%
+  select(fieldsample_barcode = sample_id, correct_date = Sampling_date) %>%
+  mutate(correct_date = dmy(correct_date) %>% format("%Y-%m-%d"))
+
+mapping.project <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P02_1_MFD metadata_32.xlsx")) %>%
+  filter(!is.na(sample_id)) %>%
+  select(sample_name, sample_id) %>%
+  as.data.frame()
   
-samples_missing_coords <- missing_coords(missing_meta = missing_meta)
+# curate metadata
+mfd_db <- mfd_db %>%
+  left_join(data_correction, by = "fieldsample_barcode") %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid & habitat_type == "natural_soil", "Natural", mfd_areatype),
+         mfd_areatype       = ifelse(project_id == pid & habitat_type == "agriculture", "Agriculture", mfd_areatype),
+         mfd_areatype       = ifelse(project_id == pid & str_detect(sampling_comment, "roadverge"), "Urban", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         #habitat_typenumber = ifelse(project_id == pid & habitat_type == "natural_soil", "0000", habitat_typenumber),
+         #habitat_typenumber = ifelse(project_id == pid & habitat_type == "agriculture", "6000", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid &  str_detect(sampling_comment, "roadverge"), "6100", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, correct_date, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path) %>%
+  select(-correct_date)
 
-out_coords_text(data_table = mfd_db_subproject, regions = regions, missing_meta = missing_meta)
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
 
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
 ```
 
-```{r, warning=F, echo=eval_debug, eval=T}
+## P02_2: Biowide - Agriculture
+```{r P02_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P02_2"
+pnm <- "Biowide - Agriculture"
+des <- "Thes samples are taken in the Biowide design (40x40 meter (or a narrower and longer grid), 81 cores pooled and subsampled). They were taken to extend agricultural sites, with the specific aim of testing possible effect of three different agricultural practices."
+ext <- ""
+peo <- "Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
-samples_on_map(data_table = mfd_db_subproject, samples_out = coords_out(regions_map = regions, data_table = mfd_db_subproject))
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
 
+data_correction <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P02_2_MFD metadata_32.xlsx")) %>%
+  select(fieldsample_barcode = sample_id, correct_date = Sampling_date) %>%
+  mutate(correct_date = dmy(correct_date) %>% format("%Y-%m-%d"))
+
+mapping.project <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P02_2_MFD metadata_32.xlsx")) %>%
+  filter(!is.na(sample_id)) %>%
+  select(sample_name, sample_id) %>%
+  as.data.frame()
+
+# curate metadata
+mfd_db <- mfd_db %>%
+  left_join(data_correction, by = "fieldsample_barcode") %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Agriculture", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid & habitat_typenumber == "31", "6612", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_typenumber == "22", "6713", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_typenumber == "11", "6123", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_typenumber == "1", "6141", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, correct_date, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path) %>%
+  select(-correct_date)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
 ```
 
-```{r, echo=eval_debug}
-rm(pid, des, ext, peo, res, com, mfd_db_subproject, N)
+## P03_1: Biowide - Urban
+```{r P03_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P03_1"
+pnm <- "Biowide - Urban"
+des <- "Biowide Urban. Related the soil tracker project."
+ext <- ""
+peo <- "Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+data_correction <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P03_1_MFD metadata_32.xlsx")) %>%
+  select(fieldsample_barcode = sample_id, correct_date = Sampling_date) %>%
+  mutate(correct_date = dmy(correct_date) %>% format("%Y-%m-%d"))
+
+mapping.project <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P03_1_MFD metadata_32.xlsx")) %>%
+  filter(!is.na(sample_id)) %>%
+  select(sample_name, sample_id) %>%
+  as.data.frame()
+
+mfd_db <- mfd_db %>%
+  left_join(data_correction, by = "fieldsample_barcode") %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid & sample_type == "soil", "Soil", mfd_sampletype),
+         mfd_sampletype     = ifelse(project_id == pid & sample_type == "sediment", "Sediment", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_parks", "6410", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_other", "6420", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_pond", "3110", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, correct_date, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path) %>%
+  select(-correct_date)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P04_1: Agriculture - Potato
+```{r P04_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P04_1"
+pnm <- "Agriculture - Potato"
+des <- "Biowide Urban. Related the soil tracker project."
+ext <- ""
+peo <- "Kåre Lehman Nielsen <kln@bio.aau.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mapping.project <- readxl::read_excel(paste0(metadata.path, "/", pid, "/MFDP006_MFD metadata.xlsx")) %>%
+  filter(!is.na(sample_id)) %>%
+  select(sample_name, sample_id) %>%
+  as.data.frame()
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid , "Agriculture", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "6429", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P04_2: Agriculture - Aaskov
+```{r P04_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P04_2"
+pnm <- "Agriculture - Aaskov"
+des <- "Samples from the Aaskov research station with the aim of looking at soil nitrification over two seasons."
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "Co-responsible: Andrew, email missing"
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Agriculture", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "6000", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P04_3: Agriculture - Kvadratnet
+```{r P04_3, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P04_3"
+pnm <- "Agriculture - Kvadratnet"
+des <- "Kvadratnet for nitratundersøgelser – yearly inevestigation of selcetd number of kvadratnet stations. Stations have been investigated since the 1980’s. Samples included for 2020 and 2021"
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "OBS: Date is estimated from a report that mentions that samples are taken in february. https://www.landbrugsinfo.dk/public/f/2/f/godskning_kvalstofprognosen_2018"
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+hab_correction <- readxl::read_excel(paste0(metadata.path, "/", pid, "/2022-11-28_mfd-metadata-kvnet.xlsx")) %>%
+   separate(unified, into = c("a", "b", "kvnet_hab"), sep = "_") %>% select(-a, -b)
+
+mfd_db <- mfd_db %>%
+  left_join(hab_correction, by = "fieldsample_barcode") %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid & habitat_type == "agriculture", "Agriculture", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, kvnet_hab, habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid & received == "2020-10-30", "2020-02-14", sampling_date),
+         sampling_date      = ifelse(project_id == pid & received == "2021-03-15", "2021-02-14", sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path) %>%
+  select(-kvnet_hab)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P04_4: Agriculture - Students
+```{r P04_4, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P04_4"
+pnm <- "Agriculture - Students"
+des <- "Student project aimed to analyze conventional vs. ecological agriculture soil."
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Agriculture", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         #habitat_typenumber = ifelse(project_id == pid, "6000", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date),
+         sampling_date      = ifelse(project_id == pid & str_detect(sampling_comment, "kvadratnet"), NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P04_5: Agriculture - Seges
+```{r P04_5, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P04_5"
+pnm <- "Agriculture - Seges"
+des <- "Soil collected by farms after harvest, dried and used for normal soil parameter analyses prior to MFD."
+ext <- "Soil parameters and historic crop data."
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+hab_correction <- readxl::read_excel(paste0(metadata.path, "/", pid, "/2022-11-28_mfd-metadata-seges.xlsx")) %>%
+  separate(unified, into = c("a", "b", "seges_hab"), sep = "_") %>%
+  select(fieldsample_barcode, seges_hab)
+
+mapping.project <- readxl::read_excel(paste0(metadata.path, "/", pid, "/2022-11-28_mfd-metadata-seges.xlsx"),
+                                     sheet = "MFD to SEGES") %>%
+  filter(!is.na(bægre)) %>%
+  mutate(sample_name=bægre, sample_id=mfd) %>%
+  select(sample_name, sample_id) %>%
+  as.data.frame()
+
+mfd_db <- mfd_db %>%
+  left_join(hab_correction, by = "fieldsample_barcode") %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid & habitat_type == "agriculture", "Agriculture", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, seges_hab, habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path) %>%
+  select(-seges_hab)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P04_6: Agriculture - SINKS
+```{r P04_6, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P04_6"
+pnm <- "Agriculture - SINKS"
+des <- "Investigate peatlands (areas with waterlogged conditions), which prevent plant material being fully decomposed. In addition to the 150 agriculture peatlands samples 150 samples from same area but of natural sites are being collected Sampling during 6 weeks period summer 2021."
+ext <- ""
+peo <- "Lis Wollesen de Jonge <AU lis.w.de.jonge@agro.au.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Agriculture", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid& str_detect(sampling_comment, "græs"), "6200", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid& str_detect(sampling_comment, "korn"), "6100", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid& str_detect(sampling_comment, "brak"), "6900", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid& str_detect(sampling_comment, "raps"), "6710", habitat_typenumber),
+         #habitat_typenumber = ifelse(project_id == pid& str_detect(sampling_comment, "andet"), "6000", habitat_typenumber),         
+         #habitat_typenumber = ifelse(project_id == pid& str_detect(sampling_comment, "ikke mark"), "0000", habitat_typenumber), 
+         sampling_date      = ifelse(project_id == pid, "2021-07-01", sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P04_7: Agriculture - Grazing
+```{r P04_7, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P04_7"
+pnm <- "Agriculture - Grazing"
+des <- "Holistic grazing"
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Agriculture", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         #habitat_typenumber = ifelse(project_id == pid, "6000", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P05_1: Urban - Rainwater
+```{r P05_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P05_1"
+pnm <- "Urban - Rainwater"
+des <- "Investigate microorganisms and heavy metals in rainwater basins across Denmark (highway and city rainwater basins). NB: samples with sediment core – to avoid metal interference for heavy metal measurements."
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "In theory the dried sampels are not sediment, but soil samples. Does not fit the ontology scheme. AAU Build Diana and Jes are the people involved."
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid , "Sediment", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(habitat_type, "city"), "3120", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(habitat_type, "highway"), "3130", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sampling_comment, "dried"), "3131", habitat_typenumber),
+         sitename           = ifelse(is.na(sitename), "", sitename),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sitename, "dried"), "3131", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sampling_comment, "dry"), "3131", habitat_typenumber),         
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P05_2: Urban - Ponds
+```{r P05_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P05_2"
+pnm <- "Urban - Ponds"
+des <- "Samples taken from deep soil in connection w aquafiers."
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "3110", habitat_typenumber),
+         sampling_comment   = ifelse(is.na(sampling_comment), "", sampling_comment),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sampling_comment, "dried"), "3111", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P06_1: Subterranean - Polluted
+```{r P06_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P06_1"
+pnm <- "Subterranean - Polluted"
+des <- ""
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "No GPS on samples, estimated from sampling_comment where a city is mentioned."
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Subterranean", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid  & str_detect(sampling_comment, "pollut"), "6130", habitat_typenumber),         
+         habitat_typenumber = ifelse(project_id == pid  & str_detect(sampling_comment, "control"), "6000", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid  & str_detect(sampling_comment, "trace"), "6120", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid  & str_detect(sampling_comment, "below detection"), "6190", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date),
+         latitude = ifelse(project_id == pid & str_detect(sampling_comment, "viby"),56.121,  latitude),
+         longitude = ifelse(project_id == pid & str_detect(sampling_comment, "viby"),10.146,  longitude),
+         latitude = ifelse(project_id == pid & str_detect(sampling_comment, "ringe"),55.223,  latitude),
+         longitude = ifelse(project_id == pid & str_detect(sampling_comment, "ringe"),10.480,  longitude),    
+         latitude = ifelse(project_id == pid & str_detect(sampling_comment, "himmark"),55.043,  latitude),
+         longitude = ifelse(project_id == pid & str_detect(sampling_comment, "himmark"),9.852,  longitude)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P06_3: Subterranean - Polluted
+```{r P06_3, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P06_3"
+pnm <- "Subterranean - Polluted"
+des <- ""
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Subterranean", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         #habitat_typenumber = ifelse(project_id == pid, "6000", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sampling_comment, "potential"), "6100", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P08_1: Natural - Habitat Vision
+```{r P08_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P08_1"
+pnm <- "Natural - Habitat Vision"
+des <- "Comparing microorganisms in natural soil with extensive fauna lists."
+ext <- "Potentially - not inhouse currently."
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "Contact: HabitatVision"
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P08_2: Natural - Other
+```{r P08_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P08_2"
+pnm <- "Natural - Other"
+des <- "Comparing micro and macro in selected habitat types. Two master projects to be finished in 2021. Anne-Cathrine and Anne Mette"
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "Assuming dates are correct, but not sure."
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P08_3: Natural - Other
+```{r P08_3, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P08_3"
+pnm <- "Natural - Other"
+des <- "Other master projects with natural samples."
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P08_4: Biowide - Other
+```{r P08_4, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P08_4"
+pnm <- "Biowide - Other"
+des <- ""
+ext <- ""
+peo <- "Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "Samples collected in connection w P02_2, but will not be analyzed (replicate samples, mix of 3 sampling circles)."
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P08_5: Natural - Sustain scapes
+```{r P08_5, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P08_5"
+pnm <- "Natural - Sustain scapes"
+des <- ""
+ext <- ""
+peo <- "Signe Normand <signe.normand@bio.au.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+correct_date <- readxl::read_excel(paste0(metadata.path, "/", pid, "/2022-07-08_mfd-metadata-sustainscapes.xlsx")) %>%
+  select(fieldsample_barcode, tdate = sampling_date, tlat = latitude, tlon = longitude) %>%
+  mutate(tdate = ymd_hms(tdate, truncated = 3) %>% format("%Y-%m-%d")) %>%
+  filter(!(fieldsample_barcode %in% c("MFD06328", "MFD06329"))) # Two dual barcodes in the data
+
+mfd_db <- mfd_db %>%
+  left_join(correct_date, by = "fieldsample_barcode") %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         #habitat_typenumber = ifelse(project_id == pid, "0000", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, tdate, sampling_date),
+         latitude           = ifelse(project_id == pid, tlat, latitude),
+         longitude          = ifelse(project_id == pid, tlon, longitude)) %>%
+  add_ontology(ontology_path = ontology.path) %>%
+  select(-tdate, -tlat, -tlon)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P08_6: Natural - Untouched forrest
+```{r P08_6, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P08_6"
+pnm <- " Natural - Untouched forrest"
+des <- ""
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "9990", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P08_7: Natural - ??
+```{r P08_7, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P08_7"
+pnm <- " Natural - ??"
+des <- ""
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+data_correction <- readxl::read_excel(paste0(metadata.path, "/", pid, "/2021-12-22_P08_7-metadata.xlsx")) %>%
+  select(fieldsample_barcode, tdate = received, thab = habitat_typenumber) %>%
+  mutate(tdate = ymd_hms(tdate, truncated = 3) %>% format("%Y-%m-%d"))
+
+mapping.project <- readxl::read_excel(paste0(metadata.path, "/", pid, "/2021-12-22_P08_7-metadata.xlsx"),
+                                      sheet = "AC_extended") %>%
+  filter(!is.na(miljoeportal)) %>%
+  mutate(sample_name=miljoeportal, sample_id=barcode_fieldsample) %>%
+  select(sample_name, sample_id) %>%
+  as.data.frame()
+
+mfd_db <- mfd_db %>%
+  left_join(data_correction, by = "fieldsample_barcode") %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, thab, habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, tdate, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path) %>%
+  select(-tdate, -thab)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P09_1: Lakes - Habitat Vision
+```{r P09_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P09_1"
+des <- ""
+pnm <- "Lakes - Habitat Vision"
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "Lakes sampled by Habitat Vision."
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P09_2: Lakes - Ponderfull
+```{r P09_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P09_2"
+pnm <- "Lakes - Ponderfull"
+des <- ""
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P10_1: Streams - Habitat Vision
+```{r P10_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P10_1"
+pnm <- "Streams - Habitat Vision"
+des <- "Sediment samples streams. Different classification of stream condition than for project P10_2 (possible to combine all into one story."
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "Habitat Vision, responsible name/email needed"
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P10_2: Streams - DVFI
+```{r P10_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P10_2"
+pnm <- "Streams - DVFI"
+des <- "Sediment samples streams. From DVFI stations, and collected in spring to be comparable to DVFI results. A lot of very specific additional data collected in field Sampling only in spring."
+ext <- ""
+peo <- "Jeppe Lund Nielsen <jln@bio.aau.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "Double-check responsible person"
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "3200", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P10_3: Streams - students
+```{r P10_3, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P10_3"
+pnm <- "Streams - students"
+des <- "Other stream samples collected by MFD/students (without additional classification needed for the big projects)."
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P11_1: Coasts - students
+```{r P11_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P11_1"
+pnm <- "Coasts - students"
+des <- "Other stream samples collected by MFD/students (without additional classification needed for the big projects)."
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "1100", habitat_typenumber),         
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P11_2: Coasts and Fjords - Philip
+```{r P11_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P11_2"
+pnm <- "Coasts and Fjords - Philip"
+des <- "Other stream samples collected by MFD/students (without additional classification needed for the big projects)."
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "coast" & str_detect(sampling_comment, "sandy"),"1101", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "coast" & str_detect(sampling_comment, "rocky"),"1102", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "coast" & str_detect(sampling_comment, "eelgrass"),"1103", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "fjords" & str_detect(sampling_comment, "sandy"),"1301", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "fjords" & str_detect(sampling_comment, "rocky"),"1302", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "fjords" & str_detect(sampling_comment, "eelgrass"),"1303", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P11_3: Fjords - Niels
+```{r P11_3, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P11_3"
+pnm <- "Fjords - Niels"
+des <- "Investigate microorganisms in water and sediment from Danish Fjords."
+ext <- ""
+peo <- "Niels Iversen <ni@bio.aau.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, str_to_title(sample_type), mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "1300", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P12_1: Deep Sea - Aarhus
+```{r P12_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P12_1"
+pnm <- "Deep Sea - Aarhus"
+des <- "Kasper: 30 samples, where extensive geochemical metadata is awailable, as well as 16S rRNA amplicon seq and qPCR. Samples from the sulfate-methane transition zone. MFD contribute possibility of making FISH probes via full operon seq.Ian: deep sediments from IODP togt in 2013, where focus have been on hunting for cablebacteria."
+ext <- ""
+peo <- "Kasper Urup Kjeldsen <kasperuk@bio.au.dk>; Ian Marshall <ianpgm@bio.au.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Subterranean", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sitename, "bornholm"), "1210", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sitename, "kattegat"), "1220", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sitename, "skagerrak"), "1230", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sitename, "lillebælt"), "1110", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sitename, "aarhus"), "1110", habitat_typenumber),         
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P12_2: Deep Sea - Aarhus
+```{r P12_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P12_2"
+pnm <- "Deep Sea - Aarhus"
+des <- ""
+ext <- ""
+peo <- "Kasper Urup Kjeldsen <kasperuk@bio.au.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Subterranean", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sitename, "bornholm"), "1210", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sitename, "anholt"), "1220", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sitename, "lille"), "1110", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P12_3: Fjords - Aarhus
+```{r P12_3, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P12_3"
+pnm <- "Fjords - Aarhus"
+des <- ""
+ext <- ""
+peo <- "Ian Marshall <ianpgm@bio.au.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Subterranean", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "1310", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P12_4: Deep Sea - SDU
+```{r P12_4, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P12_4"
+pnm <- "Deep Sea - SDU"
+des <- "Deep sea samples."
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "People missing mail: Ronnie Glud"
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Subterranean", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sampling_comment, "kamchatska"),"se_s_1420", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sampling_comment, "atacama"),"se_s_1410", habitat_typenumber),       
+         latitude           = ifelse(project_id == pid, NA, latitude),
+         longitude          = ifelse(project_id == pid, NA, longitude),          
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P13_1: Urban - Influent Wastewater
+```{r P13_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P13_1"
+pnm <- "Urban - Influent Wastewater"
+des <- "Influent wastewater samples. Compare wastewater inlet to sludge from receiving WWTP’s. Samples have already been analyzed by 16S rRNA amplicon seq."
+ext <- ""
+peo <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Water", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "3210", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P13_2: Urban - AS Wastewater
+```{r P13_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P13_2"
+pnm <- "Urban - AS Wastewater"
+des <- "Activated sludge wastewater samples."
+ext <- ""
+peo <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Water", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "3211", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P16_1: Urban - Drinking water
+```{r P16_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P16_1"
+pnm <- "Urban - Drinking water"
+des <- "Samples collected from water plants. Filtered onto filters."
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "Responsible: Peter Roslev, email to be fetched "
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Water", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "3110", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P16_2: Urban - Drinking water
+```{r P16_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P16_2"
+pnm <- "Urban - Drinking water"
+des <- ""
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Water", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "1100", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P16_3: Urban - Drinking water
+```{r P16_3, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P16_3"
+pnm <- "Urban - Drinking water"
+des <- ""
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Water", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid & sample_type == "sandfilter", "1100", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & sample_type == "water(dilute)", "3120", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & str_detect(sampling_comment, "network"), "3120", habitat_typenumber),         
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P17_1: Urban - Soil
+```{r P17_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P17_1"
+pnm <- "Urban - Soil"
+des <- "Soil collected from Danish cities across Denmark, up to 3 soil samples from same city covering different areatypes, ie parks, industrial, side of the road etc (same cities are also collected urban ponds P05_2 and rainwater P05_1)."
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_parks", "6410", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_other", "6420", habitat_typenumber),         
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P18_1: Urban - Harbour
+```{r P18_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P18_1"
+pnm <- "Urban - Harbour"
+des <- ""
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- "Should be an <urban> project instead?"
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Water", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "1110", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P19_1: Urban - Archaeological
+```{r P19_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P19_1"
+pnm <- "Urban - Archaeological"
+des <- ""
+ext <- ""
+peo <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Subterranean", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "6200", habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+
+# General outputs
+
+## Write output
+
+### Write project map
+```{r, warning=T, echo=eval_debug, eval=T}
+print_internal_map(data_table = mfd_projects, fname = paste0(reformat.metadata.path, "/mfd_projects.xlsx"))
+#writexl::write_xlsx(mfd_projects, paste0(reformat.metadata.path, "/mfd_projects.xlsx"))
 ```

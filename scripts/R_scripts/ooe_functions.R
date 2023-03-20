@@ -26,11 +26,13 @@ ooe_text <- function(project = NA, data_table = NA){
   if(class(ooe_meta)=="data.frame"){
     asis_output("### Metadata entry out of expectations
 
-The following samples contain unexpected entries:")
+The following samples contain unexpected entries:
+                ")
     print(ooe_meta)
   } else {
     asis_output("### Metadata entry out of expectations
 
-No samples have unexpected entries.")
+No samples have unexpected entries.
+                ")
   }
 }

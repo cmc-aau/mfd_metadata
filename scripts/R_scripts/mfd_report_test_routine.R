@@ -114,9 +114,12 @@ missing_info <- function(project = NA, prj_table = mfd_projects){
 }
 
 ### Find missing metadata
-missing_metadata <- function(project=NA, data_table=mfd_db){
+missing_metadata <- function(data_table = NA, indices = NA){
+  if(class(indices)!="character"){
+    indices <- colnames(data_table)
+  }
+  
   dd <- data_table %>%
-    filter(project_id==project) %>%
     filter(if_any(everything(.), is.na))
   if(nrow(dd)>0){
     return(dd) 
@@ -145,7 +148,161 @@ summarise_metadata <- function(data_table = NA){
   return(dd)
 }
 
-full_check <- function(project = NA, data_table = NA, missing_meta = NA, regions = NA){ # you can use cat
+print_incomplete_entries <- function(data_table = NA, missing_indices = NA,
+                                     fname = NA, mapping = NA,
+                                     minimal_indices = NA, project_name = NA,
+                                     minimal_indices_explanation = NA){
+  
+  minimal_explanation <- openxlsx::read.xlsx(minimal_indices_explanation, 1)
+  
+  data_table <- data_table %>%
+    mutate(habitat_typenumber=if_else(habitat_typenumber=="", NA, habitat_typenumber),
+           sitename=if_else(sitename=="", NA, sitename))
+  
+  if(file.exists(fname)){
+    file.remove(fname)
+  }
+  
+  if(class(mapping)=="data.frame"){
+    colnames(mapping) <- c("sample_id", "fieldsample_barcode")
+    data_table <- full_join(data_table, mapping, by="fieldsample_barcode")
+    minimal_indices <- c(minimal_indices, "sample_id")
+  }
+  
+  missing_meta <- missing_metadata(data_table = data_table, indices = minimal_indices)
+  
+  missing_indices <- c(missing_meta$fieldsample_barcode)
+  
+  if(class(minimal_indices)=="character"){
+    data_table <- data_table[, minimal_indices]
+  }
+  
+  data_table <- data_table %>%
+    mutate(project_name=project_name)
+  
+  #print(missing_indices)
+  
+  order.namaes <- c(missing_indices, data_table$fieldsample_barcode[!data_table$fieldsample_barcode%in%missing_indices])
+  data_table <- data_table[match(order.namaes, data_table$fieldsample_barcode),] %>%
+    filter(!is.na(fieldsample_barcode))
+    #writexl::write_xlsx(path=fname, col_names=T, format_headers=T)
+  
+    wb <- openxlsx::createWorkbook()
+    
+    openxlsx::addWorksheet(wb, "variables")
+    header_style <- openxlsx::createStyle(textDecoration = "Bold")
+    openxlsx::writeData(wb, "variables", data_table, headerStyle = header_style)
+    
+    tmp <- data.frame(x=which(is.na(data_table))%%nrow(data_table), y=(which(is.na(data_table))-1)%/%nrow(data_table)+1)
+    
+    empty_cell_style <- openxlsx::createStyle(fgFill = toupper("#bce0a8"))
+    check_cell_style <- openxlsx::createStyle(fgFill = toupper("#e38140"))
+    
+    check_cols <- which(colnames(data_table)%in%c("mfd_hab1", "mfd_hab2", "mfd_hab3"))
+    
+    for(i in 1:nrow(tmp)){
+      
+      if(tmp$y[i]%in%check_cols){
+        openxlsx::addStyle(wb, sheet = "variables", style = check_cell_style,
+                           rows = ifelse(tmp$x[i]==0, nrow(data_table), tmp$x[i])+1, cols = tmp$y[i])
+      } else {
+      openxlsx::addStyle(wb, sheet = "variables", style = empty_cell_style,
+                         rows = ifelse(tmp$x[i]==0, nrow(data_table), tmp$x[i])+1, cols = tmp$y[i])
+      }
+      
+    }
+    
+    openxlsx::addWorksheet(wb, "description")
+    header_style <- openxlsx::createStyle(textDecoration = "Bold")
+    openxlsx::writeData(wb, "description", minimal_explanation, headerStyle = header_style)
+    
+    openxlsx::saveWorkbook(wb, fname)
+}
+
+print_internal_map <- function(data_table = NA, fname = NA){
+  
+  if(file.exists(fname)){
+    file.remove(fname)
+  }
+  
+  data_table <- data_table %>%
+    mutate(across(everything(), ~if_else(.x=="", NA, .x)))
+  
+  minimal_explanation <- data.frame(variable=c("project_id",
+                                               "project_name",
+                                               "description",
+                                               "extended_metadata",
+                                               "people",
+                                               "responsible",
+                                               "comment",
+                                               "metadata_map"),
+                                    description=c("Internal ID of the projects",
+                                                  "Lay name of the project",
+                                                  "Short paragraph describing the project",
+                                                  "Content of the extended metadata associated to the project",
+                                                  "Research patner(s)",
+                                                  "Person responsible for the project",
+                                                  "Comment to the project or action to be taken",
+                                                  "Location of the metadata map for each project"))
+  
+  missing_meta <- missing_metadata(data_table = data_table, indices = colnames(data_table))
+  
+  wb <- openxlsx::createWorkbook()
+  
+  openxlsx::addWorksheet(wb, "variables")
+  header_style <- openxlsx::createStyle(textDecoration = "Bold")
+  openxlsx::writeData(wb, "variables", data_table, headerStyle = header_style)
+  
+  tmp <- data.frame(x=which(is.na(data_table))%%nrow(data_table), y=(which(is.na(data_table))-1)%/%nrow(data_table)+1)
+  
+  empty_cell_style <- openxlsx::createStyle(fgFill = toupper("#bce0a8"))
+  
+  for(i in 1:nrow(tmp)){
+    openxlsx::addStyle(wb, sheet = "variables", style = empty_cell_style,
+                         rows = ifelse(tmp$x[i]==0, nrow(data_table), tmp$x[i])+1, cols = tmp$y[i])
+  }
+  
+  openxlsx::addWorksheet(wb, "description")
+  header_style <- openxlsx::createStyle(textDecoration = "Bold")
+  openxlsx::writeData(wb, "description", minimal_explanation, headerStyle = header_style)
+  
+  openxlsx::saveWorkbook(wb, fname)
+  
+  
+}
+
+print_email <- function(project_name = NA, receivers = c(), requested_indices = c(), fname = NA){
+  # print_email(fname=paste0(wd, "/test.txt"), receivers=c("Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>", "Francesco Delogu <frde@bio.aau.dk>"), requested_indices = c("pH), "temperature)
+  # print_email(fname=paste0(wd, "/test.txt"), receivers=c("Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"), requested_indices = c("temperature"))
+  
+  receivers <- unlist(str_split(receivers, "; "))
+  first_names <- unlist(lapply(str_split(unlist(str_split(receivers, " <"))[c(T,F)], " "), function(x) x[[1]]))
+  
+  if(length(requested_indices)>1){
+    indices_string <- paste0(paste0(requested_indices[1:(length(requested_indices)-1)], collapse=", "), " and ", requested_indices[length(requested_indices)])
+    index_number <- "s"
+  } else {
+    indices_string <- requested_indices[1]
+    index_number <- ""
+  }
+  
+  sink(file=fname)
+  cat(paste(paste("To:", paste0(receivers, collapse=", "), sep=" "),
+            paste("Object:", project_name, "data collab", sep=" "),
+            "\n",
+            paste0(paste("Dear", paste0(first_names, collapse=" and "), sep=" "), ",\n"),
+            paste(paste0("I am writing you about the ", project_name, " data collaboration.",
+                  " We were reviewing the data in order to proceed with the analysis and we relised that some entries are missing (i.e. from variable", index_number, ":"),
+                  paste0(indices_string,
+                  ")."), sep=" "),
+            "Could you please fill in the missing entires (if you are able to retrieve them) in the attached file \"table_to_fill.csv\"?",
+            "The complete table should look like the extract \"example_table.csv\"\n",
+            "Best regards,",
+            sep="\n"))
+  sink(file=NULL)
+}
+
+full_check <- function(project_name = NA, data_table = NA, missing_meta = NA, regions = NA){ # you can use cat
   
   cat(ooe_text(project = project, data_table = data_table),
   

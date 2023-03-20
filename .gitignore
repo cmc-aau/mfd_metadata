@@ -1,0 +1,21 @@
+# To be ignored
+data/metadata/*
+scripts/R_scripts/mfd_report.html
+
+# To include
+!data/metadata/ontology/2022-11-28_mfd-habitat-ontology.xlsx
+
+!data/metadata/general/example_table.xlsx
+!data/metadata/general/minimal_metadata_descriptors.xlsx
+
+!data/metadata/P01_1/MFDP005_metadata_32.xlsx
+!data/metadata/P01_2/P01_2_MFD metadata_32.xlsx
+!data/metadata/P02_1/P02_1_MFD metadata_32.xlsx
+!data/metadata/P02_2/P02_2_MFD metadata_32.xlsx
+!data/metadata/P03_1/P03_1_MFD metadata_32.xlsx
+!data/metadata/P04_1/MFDP006_MFD metadata.xlsx
+!data/metadata/P04_3/2022-11-28_mfd-metadata-kvnet.xlsx
+!data/metadata/P04_5/2022-11-28_mfd-metadata-seges.xlsx
+!data/metadata/P08_6/2022-07-08_mfd-metadata-sustainscapes.xlsx
+!data/metadata/P08_7/2021-12-22_P08_7-metadata.xlsx
+

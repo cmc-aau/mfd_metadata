@@ -5,6 +5,8 @@
 # Function to coords out of map
 # Solution from https://datawanderings.com/2018/09/01/r-point-in-polygon-a-mathematical-cookie-cutter/ and https://www.linkedin.com/pulse/easy-maps-denmark-r-mikkel-freltoft-krogsholm/ using the regional map of Denmark from https://dawadocs.dataforsyningen.dk/
 coords_out <- function(regions_map = NA, data_table = NA, id = "fieldsample_barcode", lat="latitude", lon="longitude"){
+  data_table <- data_table[(!is.na(data_table$latitude)&!is.na(data_table$longitude)),]
+  
   dd <- data_table %>%
     dplyr::select(all_of(c(id, lat, lon)))
   
@@ -70,32 +72,42 @@ out_coords_text <- function(data_table=NA, regions_map=NA, missing_meta = NA, id
   N <- base::nrow(data_table)
   
   if(length(samples_missing_coords)==N){
-    return(invisible(NULL))
-    
-  }
+    asis_output("### Coordinates check
   
-  out_of_map <- coords_out(regions_map=regions_map, data_table=data_table, id=id, lat=lat, lon=lon)
-  
-  if(class(out_of_map)=="data.frame"){
-    asis_output("### Dubious location
-  
-The following samples were reported from coordinates outside of Danish land:")
-    print(out_of_map)
+All samples miss coordinates.
+                ")
+    #return(invisible(NULL))
   } else {
-    asis_output("### Dubious location
   
-No samples were reported from coordinates outside of Danish land.")
+    out_of_map <- coords_out(regions_map=regions_map, data_table=data_table[!data_table$fieldsample_barcode%in%samples_missing_coords,], id=id, lat=lat, lon=lon)
+    
+    if(class(out_of_map)=="data.frame"){
+      asis_output("### Coordinates check
+    
+  The following samples were reported from coordinates outside of Danish land:
+                  ")
+      print(out_of_map)
+    } else {
+      asis_output("### Coordinates check
+    
+  No samples were reported from coordinates outside of Danish land.
+                  ")
+    }
   }
 }
 
 samples_on_map <- function(data_table = NA, samples_out = NA, id="fieldsample_barcode", lat="latitude", lon="longitude"){
   
+  data_table <- data_table[(!is.na(data_table$latitude)&!is.na(data_table$longitude)),]
+  
   if(!is.na(samples_out)){
     data_table <- data_table %>%
-      mutate(location=if_else(id%in%samples_out, "outside DK", "inside DK"))
+      mutate(location=if_else(id%in%samples_out, "outside DK", "inside DK"),
+             location=factor(location, levels=c("inside DK", "outside DK")))
   } else {
     data_table <- data_table %>%
-      mutate(location="inside DK")
+      mutate(location="inside DK",
+             location=factor(location, levels=c("inside DK", "outside DK")))
   }
   
   out <- mapDK(detail = 'region', map.colour = "grey50") +#, map.fill = "grey95") +
