@@ -13,8 +13,10 @@ Metadata cleaning and report making for the Microflora Danica project.
 | │   └── metadata/                      | Reformatted metadata for internal usage |
 | │       └── P\<NUMBER\>/               | Project-specific folders |
 | ├── data/                              | Data used to generate the results |
-| │   ├── metadata/                      | Metadata of the project |
+| │   └─── metadata/                     | Metadata of the project |
 | │       └── P\<NUMBER\>/               | Project-specific folders |
+| ├── envs/                              | Computing environments |
+| │       └── mfd_metadata_R.yml         | Environment with the packages needed to reproduce the analysis |
 | └── scripts/                           | Scripts used to analyse the data |
 |     └── R_scripts/                     | R scripts |
 |         ├── mfd_report.Rmd             | Main notebook that generaltes all the results |

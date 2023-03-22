@@ -1600,5 +1600,9 @@ cat(res, sep = "\t")
 ### Write project map
 ```{r, warning=T, echo=eval_debug, eval=T}
 print_internal_map(data_table = mfd_projects, fname = paste0(reformat.metadata.path, "/mfd_projects.xlsx"))
-#writexl::write_xlsx(mfd_projects, paste0(reformat.metadata.path, "/mfd_projects.xlsx"))
+```
+
+### Write mfd db
+```{r, warning=T, echo=eval_debug, eval=T}
+writexl::write_xlsx(mfd_db, path = paste0(reformat.metadata.path, "/mfd_db.xlsx"))
 ```
