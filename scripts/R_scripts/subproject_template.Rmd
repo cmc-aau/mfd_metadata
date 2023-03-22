@@ -62,11 +62,15 @@ missing_meta <- missing_metadata(data_table = mfd_db_subproject, indices = minim
 
 ### Write email
 ```{r warning=F, echo=eval_debug, eval=T}
+if(!exists("paragraph2")){
+  paragraph2 <- NA
+}
+
 if(class(missing_meta)=="data.frame"){
   tmp <- summarise_missing_metadata(missing_meta) 
   dir.create(file.path(paste0(mails_01.path, "/"), pid), showWarnings = FALSE)
   dir.create(file.path(paste0(reformat.metadata.path, "/"), pid), showWarnings = FALSE)
-  print_email(fname=paste0(mails_01.path, "/", pid, "/mail.txt"), project_name = pnm, receivers = peo, requested_indices = minimal_indices)
+  print_email(fname=paste0(mails_01.path, "/", pid, "/mail.txt"), project_name = pnm, receivers = peo, requested_indices = minimal_indices, paragraph2 = paragraph2)
 }
 ```
 
@@ -110,5 +114,5 @@ metadata.map <- rbind(metadata.map, data.frame(name=c("main"), path=paste0(pid, 
                                                description=c("minimal metadata")))
 writexl::write_xlsx(metadata.map, paste0(reformat.metadata.path, "/", pid, "/", pid, "_metadata_summary.xlsx"))
 
-rm(pid, pnm, des, ext, peo, res, com, mfd_db_subproject, N, missing_meta, samples_missing_coords, mapping.project)
+rm(pid, pnm, des, ext, peo, res, com, mfd_db_subproject, N, missing_meta, samples_missing_coords, mapping.project, paragraph2)
 ```

@@ -1,11 +1,16 @@
-To: Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>, Rasmus Ejrnæs <rasmus@bios.au.dk>
+To: Tobias Guldberg Frøslev <tobiasgf@sund.ku.dk>, Rasmus Ejrnæs <rasmus@bios.au.dk>
 Object: Biowide - Ecospace data collab
 
 
 Dear Tobias and Rasmus,
 
-I am writing you about the Biowide - Ecospace data collaboration. We were reviewing the data in order to proceed with the analysis and we relised that some entries are missing (i.e. from variables: fieldsample_barcode, sample_type, sampling_date, latitude, longitude, habitat_type, habitat_typenumber, sitename, mfd_sampletype, mfd_areatype, mfd_hab1, mfd_hab2 and mfd_hab3).
-Could you please fill in the missing entires (if you are able to retrieve them) in the attached file "table_to_fill.csv"?
-The complete table should look like the extract "example_table.csv"
+I am writing you about the Biowide - Ecospace data collaboration. We were reviewing the data in order to proceed with the analysis and we realised that some entries are missing (i.e. from variables: fieldsample_barcode, sample_type, sampling_date, latitude, longitude, habitat_type, habitat_typenumber, sitename, mfd_sampletype, mfd_areatype, mfd_hab1, mfd_hab2 and mfd_hab3).
+
+Could you please fill in the missing entires (if you are able to retrieve them) in the attached file "table_to_fill.xlsx"? The complete table should look like the extract "example_table.xlsx".
+In the "table_to_fill.xlsx" the first sheet (called variables) contains the data whilst the second one (called description) explains each variable and what kind of input is needed from your side. The "variables" sheet includes the missing entries for which your input is needed (highlighted in green), as well as the missing entries that will be automatically filled by us (highlighted in orange) given your input on the variable "habitat_typenumber". We included the ontology file ("2022-11-28_mfd-habitat-ontology.xlsx") to help in choosing the most descriptive habitat_typenumber.
+
+For the samples marked with "Agriculture" as "habitat_type", do you have information on the crop type or can you chose from the attached ontology file?
+Moreover, could you please provide feedback on the 6100 habitat_typenumber? E.g., do you think we should change it to something else or be more specific - for insgance make a 6110 number (corresponding to hedgerow) and 6120 (corresponding to readverge) or others?
 
 Best regards,
+Per Halkjær Nielsen

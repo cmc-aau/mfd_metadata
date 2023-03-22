@@ -156,7 +156,8 @@ print_incomplete_entries <- function(data_table = NA, missing_indices = NA,
   minimal_explanation <- openxlsx::read.xlsx(minimal_indices_explanation, 1)
   
   data_table <- data_table %>%
-    mutate(habitat_typenumber=if_else(habitat_typenumber=="", NA, habitat_typenumber),
+    mutate(across(everything(), ~trimws(.x)),
+           habitat_typenumber=if_else(habitat_typenumber=="", NA, habitat_typenumber),
            sitename=if_else(sitename=="", NA, sitename))
   
   if(file.exists(fname)){
@@ -180,12 +181,9 @@ print_incomplete_entries <- function(data_table = NA, missing_indices = NA,
   data_table <- data_table %>%
     mutate(project_name=project_name)
   
-  #print(missing_indices)
-  
   order.namaes <- c(missing_indices, data_table$fieldsample_barcode[!data_table$fieldsample_barcode%in%missing_indices])
   data_table <- data_table[match(order.namaes, data_table$fieldsample_barcode),] %>%
     filter(!is.na(fieldsample_barcode))
-    #writexl::write_xlsx(path=fname, col_names=T, format_headers=T)
   
     wb <- openxlsx::createWorkbook()
     
@@ -271,9 +269,15 @@ print_internal_map <- function(data_table = NA, fname = NA){
   
 }
 
-print_email <- function(project_name = NA, receivers = c(), requested_indices = c(), fname = NA){
+print_email <- function(project_name = NA, receivers = c(), requested_indices = c(), fname = NA, paragraph2 = NA){
   # print_email(fname=paste0(wd, "/test.txt"), receivers=c("Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>", "Francesco Delogu <frde@bio.aau.dk>"), requested_indices = c("pH), "temperature)
   # print_email(fname=paste0(wd, "/test.txt"), receivers=c("Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"), requested_indices = c("temperature"))
+  
+  if(class(paragraph2)=="character"){
+    paragraph2 <- paste0(paragraph2, "\n")
+  } else {
+    paragraph2 <- ""
+  }
   
   receivers <- unlist(str_split(receivers, "; "))
   first_names <- unlist(lapply(str_split(unlist(str_split(receivers, " <"))[c(T,F)], " "), function(x) x[[1]]))
@@ -292,12 +296,19 @@ print_email <- function(project_name = NA, receivers = c(), requested_indices = 
             "\n",
             paste0(paste("Dear", paste0(first_names, collapse=" and "), sep=" "), ",\n"),
             paste(paste0("I am writing you about the ", project_name, " data collaboration.",
-                  " We were reviewing the data in order to proceed with the analysis and we relised that some entries are missing (i.e. from variable", index_number, ":"),
+                  " We were reviewing the data in order to proceed with the analysis and we realised that some entries are missing (i.e. from variable", index_number, ":"),
                   paste0(indices_string,
-                  ")."), sep=" "),
-            "Could you please fill in the missing entires (if you are able to retrieve them) in the attached file \"table_to_fill.csv\"?",
-            "The complete table should look like the extract \"example_table.csv\"\n",
+                  ").\n"),
+                  sep=" "),
+            paste("Could you please fill in the missing entires (if you are able to retrieve them) in the attached file \"table_to_fill.xlsx\"?",
+            "The complete table should look like the extract \"example_table.xlsx\".", sep=" "),
+            paste("In the \"table_to_fill.xlsx\" the first sheet (called variables) contains the data whilst the second one (called description) explains each variable and what kind of input is needed from your side.",
+                  "The \"variables\" sheet includes the missing entries for which your input is needed (highlighted in green), as well as the missing entries that will be automatically filled by us (highlighted in orange) given your input on the variable \"habitat_typenumber\".",
+                  "We included the ontology file (\"2022-11-28_mfd-habitat-ontology.xlsx\") to help in choosing the most descriptive habitat_typenumber.\n",
+                  sep=" "),
+            paragraph2,
             "Best regards,",
+            "Per Halkjær Nielsen",
             sep="\n"))
   sink(file=NULL)
 }
