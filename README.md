@@ -15,6 +15,8 @@ Metadata cleaning and report making for the Microflora Danica project.
 | ├── data/                              | Data used to generate the results |
 | │   └─── metadata/                     | Metadata of the project |
 | │       └── P\<NUMBER\>/               | Project-specific folders |
+| │       └── mfd_db.xlsx                | Curated metadata in a single table |
+| │       └── mfd_projects.xlsx          | Curated information about the projects in a single table |
 | ├── envs/                              | Computing environments |
 | │       └── mfd_metadata_R.yml         | Environment with the packages needed to reproduce the analysis |
 | └── scripts/                           | Scripts used to analyse the data |
