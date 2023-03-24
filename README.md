@@ -1,7 +1,10 @@
 # mfd_metadata
 
 ## Intro
-Metadata cleaning and report making for the Microflora Danica project.
+Many sources of samples contributed to the Microflora Danica collection. This work orgnaises the received metadata from the various subprojects in a standardised way and prepares the (semi-)automated request for the missing information.
+
+![alt_text](/data/images/mfd_files_organization.png)
+
 
 ## Repo strucutre
 
