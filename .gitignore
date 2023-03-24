@@ -1,5 +1,5 @@
 # To be ignored
-data/metadata/*
+data/metadata/*/*
 scripts/R_scripts/mfd_report.html
 
 # To include
