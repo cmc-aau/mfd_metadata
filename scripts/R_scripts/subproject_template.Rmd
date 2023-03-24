@@ -8,16 +8,11 @@ output:
     toc_float: true
     toc_collapsed: true
 ---
-
-```{r echo=eval_debug, eval=T}
-#ls()
-```
-
-## Description
+### Description
 
 `r pid`: `r des`
 
-## Info
+### Info
 **Extended metadata:** `r ext`
 
 **People:** `r peo`
@@ -26,41 +21,36 @@ output:
 
 **Comments:** `r com``
 
-## Info status 
+### Info status 
 
 ```{r echo=eval_debug, eval=T}
 missing_info(project = pid)
 ```
 
-## Metadata summary
+### Metadata summary
 
 ```{r warning=F, echo=eval_debug, eval=T}
 summarise_metadata(data_table = mfd_db_subproject) %>%
   kable(align="r", digits=2)
 ```
 
-## Metadata status
+### Metadata status
 ```{r echo=eval_debug, eval=T}
-#ooe_text(data_table = mfd_db_subproject)
+ooe_text(data_table = mfd_db_subproject)
 ```
 
 ```{r echo=eval_debug, eval=T}
 missing_meta <- missing_metadata(data_table = mfd_db_subproject, indices = minimal_indices)
-#print(missing_meta)
-#out_coords_text(data_table = mfd_db_subproject, regions = regions, missing_meta = missing_meta)
+out_coords_text(data_table = mfd_db_subproject, regions = regions, missing_meta = missing_meta)
 ```
 
 ```{r warning=F, echo=eval_debug, eval=T}
-#samples_missing_coords <- missing_coords(mfd_db_subproject)
-
-#if(length(samples_missing_coords)<N){
-#  samples_on_map(data_table = mfd_db_subproject, samples_out = coords_out(regions_map = regions, data_table = mfd_db_subproject))
-#}
+samples_on_map(data_table = mfd_db_subproject, samples_out = coords_out(regions_map = regions, data_table = mfd_db_subproject))
 ```
 
-## Output
+### Output
 
-### Write email
+#### Write email
 ```{r warning=F, echo=eval_debug, eval=T}
 if(!exists("paragraph2")){
   paragraph2 <- NA
@@ -74,14 +64,14 @@ if(class(missing_meta)=="data.frame"){
 }
 ```
 
-### Write mapping
+#### Write mapping
 ```{r echo=eval_debug, message=F, warning=F, error=F}
 if(exists("mapping.project")){
   writexl::write_xlsx(mapping.project, paste0(reformat.metadata.path, "/", pid, "/", pid, "_mapping.xlsx"))
 }
 ```
 
-### Write table to be completed
+#### Write table to be completed
 ```{r echo=eval_debug, message=F, warning=F, error=F}
 if(exists("mapping.project")&class(missing_meta)=="data.frame"){
   print_incomplete_entries(data_table = mfd_db_subproject,
@@ -101,13 +91,13 @@ if(exists("mapping.project")&class(missing_meta)=="data.frame"){
 }
 ```
 
-### Write minimal metadata
+#### Write minimal metadata
 ```{r echo=eval_debug, message=F, warning=F, error=F}
 dir.create(file.path(paste0(reformat.metadata.path, "/"), pid), showWarnings = FALSE)
 writexl::write_xlsx(mfd_db_subproject, paste0(reformat.metadata.path, "/", pid, "/", pid, "_minimal_metadata.xlsx"))
 ```
 
-### Write project metadata map
+#### Write project metadata map
 ```{r echo=eval_debug, message=F, warning=F, error=F}
 metadata.map <- data.frame(name=c(), path=c(), description=c())
 metadata.map <- rbind(metadata.map, data.frame(name=c("main"), path=paste0(pid, "/", pid, "_minimal_metadata.xlsx"),

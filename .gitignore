@@ -1,6 +1,7 @@
 # To be ignored
 data/metadata/*/*
 scripts/R_scripts/mfd_report.html
+scripts/R_scripts/.Rhistory
 
 # To include
 !data/metadata/ontology/2022-11-28_mfd-habitat-ontology.xlsx

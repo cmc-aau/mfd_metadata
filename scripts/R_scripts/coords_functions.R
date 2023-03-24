@@ -27,6 +27,9 @@ coords_out <- function(regions_map = NA, data_table = NA, id = "fieldsample_barc
 }
 
 missing_coords <-  function(missing_meta = NA){
+  if(class(missing_meta)!="data.frame"){
+    return(F)
+  }
   samples_missing_coords <- missing_meta %>%
     filter(is.na(latitude) | is.na(longitude)) %>%
     select(fieldsample_barcode) %>%
@@ -51,13 +54,13 @@ missing_coords_text <- function(data_table = NA, missing_meta = NA){
 No missing coordinates.")
   } else if(length(samples_missing_coords)==N){
     print("here2")
-    asis_output("### Missing coordinates
+    asis_output("#### Missing coordinates
 
 The coordinates (latitude and/or longitude) of all the samples are missing.")
     
   } else {
     print("here3")
-    asis_output("### Missing coordinates
+    asis_output("#### Missing coordinates
 
 The coordinates (latitude and/or longitude) of the following samples are missing:")
     print(samples_missing_coords %>% cat(sep=", "))
@@ -71,8 +74,12 @@ out_coords_text <- function(data_table=NA, regions_map=NA, missing_meta = NA, id
   #print(samples_missing_coords)
   N <- base::nrow(data_table)
   
+  if(class(samples_missing_coords)=="logical"){
+    samples_missing_coords <- c()
+  }
+  
   if(length(samples_missing_coords)==N){
-    asis_output("### Coordinates check
+    asis_output("#### Coordinates check
   
 All samples miss coordinates.
                 ")
@@ -80,15 +87,15 @@ All samples miss coordinates.
   } else {
   
     out_of_map <- coords_out(regions_map=regions_map, data_table=data_table[!data_table$fieldsample_barcode%in%samples_missing_coords,], id=id, lat=lat, lon=lon)
-    
-    if(class(out_of_map)=="data.frame"){
-      asis_output("### Coordinates check
-    
-  The following samples were reported from coordinates outside of Danish land:
-                  ")
-      print(out_of_map)
+
+    if(class(out_of_map)=="character"){
+      asis_output(paste0("#### Coordinates check",
+                         "\n\n",
+                         "The following samples were reported from coordinates outside of Danish land:",
+                         "\n\n",
+                         paste0(out_of_map, collapse=", ")))
     } else {
-      asis_output("### Coordinates check
+      asis_output("#### Coordinates check
     
   No samples were reported from coordinates outside of Danish land.
                   ")
@@ -97,22 +104,27 @@ All samples miss coordinates.
 }
 
 samples_on_map <- function(data_table = NA, samples_out = NA, id="fieldsample_barcode", lat="latitude", lon="longitude"){
-  
+
   data_table <- data_table[(!is.na(data_table$latitude)&!is.na(data_table$longitude)),]
   
-  if(!is.na(samples_out)){
+  if(nrow(data_table)==0){
+    return(invisible(NULL))
+  }
+  
+  if(class(samples_out)=="character"){
     data_table <- data_table %>%
-      mutate(location=if_else(id%in%samples_out, "outside DK", "inside DK"),
+      mutate(location=if_else(fieldsample_barcode %in% samples_out, "outside DK", "inside DK"),
              location=factor(location, levels=c("inside DK", "outside DK")))
   } else {
     data_table <- data_table %>%
       mutate(location="inside DK",
              location=factor(location, levels=c("inside DK", "outside DK")))
   }
-  
+
   out <- mapDK(detail = 'region', map.colour = "grey50") +#, map.fill = "grey95") +
     geom_point(data = data_table, 
-               aes(x = longitude, y = latitude, group = NA, color=location), size = 1, alpha = 0.5) +
+               aes(x = longitude, y = latitude, group = NA, color = location), size = 1, alpha = 1) +
+    scale_color_manual(values = c(toupper("#ed9a26"), toupper("#29d6e6"))) +
     theme(legend.position = c(0.8,0.8))
   
   return(out)

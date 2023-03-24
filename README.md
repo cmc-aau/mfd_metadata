@@ -35,7 +35,7 @@ Many sources of samples contributed to the Microflora Danica collection. This wo
 1. Clone this repo
 2. Create the environment:
 ```
-mamba env create -f /envs/mfd_metadata_R.yml
+mamba env create -f envs/mfd_metadata_R.yml
 ```
 3. Activate the environment
 ```
