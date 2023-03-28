@@ -9,7 +9,6 @@ The final structure uses a "mfd_project" table listing the subprojects with summ
 - table\<N\>: all the other tables containing furhter metadata (e.g. vegetation coverage, land usage, etc.). In this case the variable might not be intuitive and it is mandatory for each table to have two sheets. The first sheet (called "variables") contains the data proper, whilst the second one (called "description") contains a verbose description of the variables.
 
 
-
 ![alt_text](/data/images/mfd_files_organization.png)
 
 
@@ -34,14 +33,11 @@ The final structure uses a "mfd_project" table listing the subprojects with summ
 | │       └── mfd_metadata_R.yml                       | Environment with the packages needed to reproduce the analysis |
 | └── scripts/                                         | Scripts used to analyse the data |
 |         └── R_scripts/                               | R scripts |
-|.            ├── mfd_report.Rmd                       | Main notebook that generaltes all the results |
-|.            ├── subroject_template.Rmd               | Per-project R Markdown template |
-|.            ├── mfd_report_test_routine.R            | I/O and text printing functions for the template |
-|.            ├── coords_functions.R                   | Functions to work on the coordinates in the template |
-|.            └── ooe_functions.R                      | Functions to work on the out-of-expectation entries in the template |
-
-
-
+|             ├── mfd_report.Rmd                       | Main notebook that generaltes all the results |
+|             ├── subroject_template.Rmd               | Per-project R Markdown template |
+|             ├── mfd_report_test_routine.R            | I/O and text printing functions for the template |
+|             ├── coords_functions.R                   | Functions to work on the coordinates in the template |
+|             └── ooe_functions.R                      | Functions to work on the out-of-expectation entries in the template |
 
 ## Workflow
 
