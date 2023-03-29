@@ -15,6 +15,7 @@ params:
   debug: no
   debug2: no
   internal: yes
+  release: no
 ---
 
 <style type="text/css">
@@ -72,20 +73,28 @@ minimal_indices_explanation <- paste0(metadata.path, '/general/minimal_metadata_
 reformat.metadata.path <- paste0(wd, '/../../analysis/metadata')
 mails_01.path <- paste0(wd, '/../../analysis/mails_01')
 
+releases.path <- paste0(wd, '/../../analysis/releases')
+
 minimal_indices <- c("fieldsample_barcode", "sample_type", "sampling_date",
+                     "latitude", "longitude",  "habitat_type", "habitat_typenumber", "sitename",
+                     "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3") # NA is interpreted as all
+
+release_indices <- c("project_id",
+                     "fieldsample_barcode", "sample_type", "sampling_date",
                      "latitude", "longitude",  "habitat_type", "habitat_typenumber", "sitename",
                      "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3") # NA is interpreted as all
 
 eval_debug <- params$debug
 eval_debug2 <- params$debug2
 eval_internal <- params$internal
+eval_release <- params$release
 ```
 
 This section is meant for internal use and debugging, if you are interest in seeing the code please knit again the document setting the "debug" flag to "true". Optionally, set "debug2" as "true" to see also the code to generate the debug headings and text.
 
 For the generation of this document the parameters were set as:
 ```{r print params, echo=eval_debug}
-data.frame(param=c("debug", "debug2", "internal"), value=c(eval_debug, eval_debug2, eval_internal)) %>%
+data.frame(param=c("debug", "debug2", "internal", "release"), value=c(eval_debug, eval_debug2, eval_internal, eval_release)) %>%
   kable()
 ```
 
@@ -102,13 +111,6 @@ methods(pstats)
 ```
 
 ## Load data
-
-### Load MFD projects summary
-```{r load project summary}
-#mfd_projects <- readxl::read_excel(mfd_projects.path)
-#mfd_project.name_conversion <- c("pid", "pnm", "des", "ext", "peo", "res", "com", "metadata_map_location")
-#names(mfd_project.name_conversion) <- c("project_id",	"project_name",	"project_description",	"extended_description",	"people",	"responsible",	"comment",	"metadata_map_location")
-```
 
 ### Download metadata from online Microflora Danica database
 This is the database that is linked to initial data-entry via the Microflora Danica App.
@@ -150,11 +152,11 @@ rm(con, qry, executedQuery, token)
 ```{r curate mfd project, echo=eval_debug}
 mfd_db <- mfd_db0 %>%
   rowwise() %>%
-  mutate(received=min(c(scanned, received), na.rm = T)) %>%
+  mutate(received=min(c(scanned, received), na.rm = T)) %>%                              # assume that the earliest date between received and scanned is the sampling date, if one is NA the other one is selected
   #mutate(received = dmy_hms(received, truncated = 3) %>% format("%Y-%m-%d")) %>%        # format dates
   ungroup() %>%
   select(-scanned) %>%
-  #filter(str_detect(fieldsample_barcode, "^MFD")) %>%                                   # filter strange barcodes
+  #filter(str_detect(fieldsample_barcode, "^MFD")) %>%                                   # not filtering for strange (unmatched) barcodes
   filter(!str_detect(sampling_comment, "extraction neg") | is.na(sampling_comment)) %>% # remove ext negative
   mutate(across(!c(fieldsample_barcode, project_id), ~tolower(as.character(.)))) %>%    # make all lowercase
   mutate(across(habitat_typenumber, ~ toupper(.))) %>%                                  # format habitat number
@@ -206,7 +208,7 @@ pid <- "P01_1"
 pnm <- "Biowide - Original"
 des <- "Biowide (Biodiversity in Width and Depth). In light of the biodiversity crisis and our limited ability to explain variation in biodiversity, tools to quantify spatial and temporal variation in biodiversity and its underlying drivers are critically needed. Inspired by the recently published ecospace framework, we developed and tested a sampling design for environmental and biotic mapping. We selected 130 study sites (40×40 m) across Denmark using stratified random sampling along the major environmental gradients underlying biotic variation. Using standardized methods, we collected site species data on vascular plants, bryophytes, macrofungi, lichens, gastropods and arthropods. To evaluate sampling efficiency, we calculated regional coverage (relative to the known species number per taxonomic group), and site scale coverage (i.e., sample completeness per taxonomic group at each site). To extend taxonomic coverage to organisms that are difficult to sample by classical inventories (e.g., nematodes and non-fruiting fungi), we collected soil for metabarcoding. Finally, to assess site conditions, we mapped abiotic conditions, biotic resources and habitat continuity. The main paper is described here: https://bmcecol.biomedcentral.com/articles/10.1186/s12898-019-0260-x. See a list of related publications here: https://ecos.au.dk/forskningraadgivning/temasider/publikationer."
 ext <- "Environmental parameters; alternative habitat classifications; plant counts; animal counts; fungal counts; ITS2 amplicons; trnL amplicons."
-peo <- "Tobias Guldberg Frøslev <tobiasgf@sund.ku.dk>; Rasmus Ejrnæs <rasmus@bios.au.dk>"
+peo <- "Tobias Guldberg Frøslev <tfroeslev@gbif.org>; Rasmus Ejrnæs <rasmus@bios.au.dk>"
 res <- "Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
 com <- ""
 
@@ -243,8 +245,8 @@ pid <- "P01_2"
 pnm <- "Biowide - River valleys"
 des <- "Biowide extension with samples from river valleys"
 ext <- "Environmental parameters; alternative habitat classifications; plant counts; animal counts; fungal counts"
-peo <- "Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>; Rasmus Ejrnæs <rasmus@bios.au.dk>"
-res <- "Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
+peo <- "Tobias Guldberg Frøslev <tfroeslev@gbif.org>; Rasmus Ejrnæs <rasmus@bios.au.dk>"
+res <- "Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>; Per Halkjær Nielsen <phn@bio.aau.dk>"
 com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
@@ -282,8 +284,8 @@ pid <- "P02_1"
 pnm <- "Biowide - Ecospace"
 des <- "Biowide Ecospace. Not sure what the aim of this study was."
 ext <- "Environmental parameters; alternative habitat classifications; plant counts; animal counts; fungal counts"
-peo <- "Tobias Guldberg Frøslev <tobiasgf@sund.ku.dk>; Rasmus Ejrnæs <rasmus@bios.au.dk>"
-res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+peo <- "Rasmus Ejrnæs <rasmus@bios.au.dk>"
+res <- "Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>; Per Halkjær Nielsen <phn@bio.aau.dk>; Albert Vejlin Stefansen <a.stefansen@rn.dk>"
 com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
@@ -327,7 +329,7 @@ pnm <- "Biowide - Agriculture"
 des <- "Thes samples are taken in the Biowide design (40x40 meter (or a narrower and longer grid), 81 cores pooled and subsampled). They were taken to extend agricultural sites, with the specific aim of testing possible effect of three different agricultural practices."
 ext <- ""
 peo <- "Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>"
-res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+res <- "Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>; Per Halkjær Nielsen <phn@bio.aau.dk>"
 com <- ""
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -369,11 +371,11 @@ cat(res, sep = "\t")
 ```{r P03_1, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P03_1"
 pnm <- "Biowide - Urban"
-des <- "Biowide Urban. Related the soil tracker project."
+des <- "Related the soil tracker project, see \"Treated like dirt: Robust forensic and ecological inferences from soil eDNA after challenging sample storage\" https://onlinelibrary.wiley.com/doi/10.1002/edn3.367"
 ext <- ""
-peo <- "Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>"
+peo <- "Tobias Guldberg Frøslev <tfroeslev@gbif.org>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Publications: So far unclear if we should make dedicated joint publication on this dataset."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -413,11 +415,11 @@ cat(res, sep = "\t")
 ```{r P04_1, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P04_1"
 pnm <- "Agriculture - Potato"
-des <- "Biowide Urban. Related the soil tracker project."
+des <- "Samples from potato fields looking at potato diseases. Not possible to get gps coordinates or farmer agreements."
 ext <- ""
 peo <- "Kåre Lehman Nielsen <kln@bio.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Close project – data cannot be used. Remove data from database – cannot be released."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -448,9 +450,9 @@ pid <- "P04_2"
 pnm <- "Agriculture - Aaskov"
 des <- "Samples from the Aaskov research station with the aim of looking at soil nitrification over two seasons."
 ext <- ""
-peo <- ""
+peo <- "Henning Carlo Thomsen <henning.thomsen@agro.au.dk>; Bent Tolstrup Christensen <bent.t.christensen@agro.au.dk>; Albert Vejlin Stefansen <albert_stefansen@hotmail.com>; Andrew Giguere <andrew.giguere@univie.ac.at>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Co-responsible: Andrew, email missing"
+com <- "Publications:  Andrew has one in preparation"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -476,11 +478,11 @@ cat(res, sep = "\t")
 ```{r P04_3, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P04_3"
 pnm <- "Agriculture - Kvadratnet"
-des <- "Kvadratnet for nitratundersøgelser – yearly inevestigation of selcetd number of kvadratnet stations. Stations have been investigated since the 1980’s. Samples included for 2020 and 2021"
+des <- "Kvadratnet for nitrate levels – yearly investigation of selected number of kvadratnet stations. Stations have been investigated since the 1980’s. Samples included for 2020 and 2021."
 ext <- ""
-peo <- ""
+peo <- "Camilla Lemming <cal@seges.dk>; Rita Hørfarter <rih@seges.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "OBS: Date is estimated from a report that mentions that samples are taken in february. https://www.landbrugsinfo.dk/public/f/2/f/godskning_kvalstofprognosen_2018"
+com <- "OBS: Date is estimated from a report that mentions that samples are taken in february. https://www.landbrugsinfo.dk/public/f/2/f/godskning_kvalstofprognosen_2018. Publications: So far unclear if we should make dedicated joint publication on this dataset."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -514,11 +516,11 @@ cat(res, sep = "\t")
 ```{r P04_4, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P04_4"
 pnm <- "Agriculture - Students"
-des <- "Student project aimed to analyze conventional vs. ecological agriculture soil."
+des <- "Student project aimed to analyze conventional vs. ecological agriculture soil. 7 sem. students."
 ext <- ""
 peo <- ""
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Publications: none – dataset is just part of MfD"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -545,11 +547,11 @@ cat(res, sep = "\t")
 ```{r P04_5, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P04_5"
 pnm <- "Agriculture - Seges"
-des <- "Soil collected by farms after harvest, dried and used for normal soil parameter analyses prior to MFD."
+des <- "Agricultural soil collected by farms after harvest, dried and used for normal soil parameter analyses prior to MfD. OK-Lab have made soil-chemistry analyses."
 ext <- "Soil parameters and historic crop data."
-peo <- ""
+peo <- "Camilla Lemming <cal@seges.dk>; Rita Hørfarter <rih@seges.dk>; Ole Kristensen <oklab@mail.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Publications: It is likely that we could make dedicated joint publication on this dataset. "
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -590,9 +592,9 @@ pid <- "P04_6"
 pnm <- "Agriculture - SINKS"
 des <- "Investigate peatlands (areas with waterlogged conditions), which prevent plant material being fully decomposed. In addition to the 150 agriculture peatlands samples 150 samples from same area but of natural sites are being collected Sampling during 6 weeks period summer 2021."
 ext <- ""
-peo <- "Lis Wollesen de Jonge <AU lis.w.de.jonge@agro.au.dk>"
+peo <- "Lis Wollesen de Jonge <lis.w.de.jonge@agro.au.dk>; Anne-Cathrine Storgaard Danielsen <acsd@agro.au.dk>; Cecilie Hermansen <cecilie.hermansen@agro.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Publications: This will be part of AU collaborations with joint publication on this dataset"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -619,12 +621,11 @@ cat(res, sep = "\t")
 ```{r P04_7, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P04_7"
 pnm <- "Agriculture - Grazing"
-des <- "Holistic grazing"
+des <- "Investigate soil samples from 3 farmers about effect of organically grown crops. See: https://www.facebook.com/SundJordSundKost/"
 ext <- ""
-peo <- ""
+peo <- "Jørgen Friis Pedersen <friisnibe@gmail.com>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
-com <- ""
+com <- "No publications. We have promised to send an overview of microbes in the samples - to look for potential major differences."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -651,9 +652,9 @@ pid <- "P05_1"
 pnm <- "Urban - Rainwater"
 des <- "Investigate microorganisms and heavy metals in rainwater basins across Denmark (highway and city rainwater basins). NB: samples with sediment core – to avoid metal interference for heavy metal measurements."
 ext <- ""
-peo <- ""
-res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "In theory the dried sampels are not sediment, but soil samples. Does not fit the ontology scheme. AAU Build Diana and Jes are the people involved."
+peo <- "Jes Vollertsen <jesvollertsen@build.aau.dk>; Dian Stephansen <dast@build.aau.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Marta Anna Nierychlo <mni@bio.aau.dk>"
+com <- "In theory the dried sampels are not sediment, but soil samples. Does not fit the ontology scheme. Publication: Agreement on one joint paper on rainwater basins, metals and microbes. Dian S. driving force."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -681,11 +682,11 @@ cat(res, sep = "\t")
 ```{r P05_2, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P05_2"
 pnm <- "Urban - Ponds"
-des <- "Samples taken from deep soil in connection w aquafiers."
+des <- "The goal was to get samples to MfD from \"urban\" waters, they may have another community composition compared to \"natural\" waters (lakes and streams). Also to look for potential differences across Denmark. Sediment samples taken from towns/cities: small and very small lakes (branddamme)."
 ext <- ""
 peo <- ""
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "The responisble people are Erika Dvarionaite and Amalie Berg-Mortensen (email to be found). Publications: So far unclear if we should make dedicated publication on this dataset. Likely not. Could perhaps go together with data from all MfD lakes (P09_1)."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -711,11 +712,11 @@ cat(res, sep = "\t")
 ```{r P06_1, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P06_1"
 pnm <- "Subterranean - Polluted"
-des <- ""
+des <- "Part of \"Biomap\" project at AU (to develop the use of electrical fields to trace soil pollutants): https://pure.au.dk/portal/en/projects/biomap--microbiologically-assisted-mapping-of-soil-pollution(136bad80-1ab8-4234-abfd-d3ae63384933).html. Viby: oil contamination; Ringe: asfalt contamination; Himmark: Chlorinated hydrocarbons contam. 1-3 meters. Controls: 1 m"
 ext <- ""
-peo <- ""
+peo <- "Andreas Schramm <andreas.schramm@bio.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "No GPS on samples, estimated from sampling_comment where a city is mentioned."
+com <- "No GPS on samples, estimated from sampling_comment where a city is mentioned. Project should be evaluated for future work."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -750,9 +751,9 @@ pid <- "P06_3"
 pnm <- "Subterranean - Polluted"
 des <- ""
 ext <- ""
-peo <- ""
+peo <- "Jeppe Lund Nielsen <jln@bio.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Should this project be closed? Method does not work well for the type of sample (came as DNA, extracted with FastSpin)."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -778,11 +779,11 @@ cat(res, sep = "\t")
 ```{r P08_1, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P08_1"
 pnm <- "Natural - Habitat Vision"
-des <- "Comparing microorganisms in natural soil with extensive fauna lists."
+des <- "One of our major projects with samples from >2500 natural habitats across Denmark. They are all classified after habitat type according to Natura 2000. Two overall goals: 1) look for diversity across habitats; 2) compare microorganisms in natural soil with related extensive fauna lists."
 ext <- "Potentially - not inhouse currently."
-peo <- ""
+peo <- "Erik Aude <eau@habitatvision.dk>; Lene Thomsen <lt@habitatvision.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Contact: HabitatVision"
+com <- "Publication: Data for several publications. Need to be discussed which papers and lead authors."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -809,11 +810,11 @@ cat(res, sep = "\t")
 ```{r P08_2, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P08_2"
 pnm <- "Natural - Other"
-des <- "Comparing micro and macro in selected habitat types. Two master projects to be finished in 2021. Anne-Cathrine and Anne Mette"
+des <- "Comparing micro and macro in selected habitat types. Two master projects to be finished in 2021. Anne-Cathrine and Anne Mette later."
 ext <- ""
-peo <- ""
+peo <- "Dan Bruhn <db@bio.aau.dk>; Anne-Cathrine Storgaard Danielsen <acsd@agro.au.dk>; Lis Wollesen de Jonge <lis.w.de.jonge@agro.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Assuming dates are correct, but not sure."
+com <- "Assuming dates are correct, but not sure. Publications: One paper is being written by Anne-Cathrine based on amplicon data."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -840,7 +841,7 @@ des <- "Other master projects with natural samples."
 ext <- ""
 peo <- ""
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Figure out what projects are collapsed into this project. Add description of project."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -863,10 +864,10 @@ cat(res, sep = "\t")
 ```{r P08_4, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P08_4"
 pnm <- "Biowide - Other"
-des <- ""
+des <- "Samples collected in connection w P02_2, but will not be analyzed (replicate samples, mix of 3 sampling circles)"
 ext <- ""
 peo <- "Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>"
-res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+res <- "Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>; Per Halkjær Nielsen <phn@bio.aau.dk>"
 com <- "Samples collected in connection w P02_2, but will not be analyzed (replicate samples, mix of 3 sampling circles)."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
@@ -890,11 +891,11 @@ cat(res, sep = "\t")
 ```{r P08_5, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P08_5"
 pnm <- "Natural - Sustain scapes"
-des <- ""
+des <- "Collaboration about 750 samples for biodiversity studies in SustainScapes from primarily natural sites. AU works on the plant part, often in combination with Habitatvision. "
 ext <- ""
-peo <- "Signe Normand <signe.normand@bio.au.dk>"
-res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+peo <- "Signe Normand <signe.normand@bio.au.dk>; Urs Treier <urs.treier@bio.au.dk>; Bjarke Madsen <bjarke.madsen@bio.au.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
+com <- "Publications: This will be part of AU collaborations with joint publication on this dataset. We only have GPS and date – are these correct? Sampling points look very clustered."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -922,15 +923,15 @@ res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globale
 cat(res, sep = "\t")
 ```
 
-## P08_6: Natural - Untouched forrest
+## P08_6: Natural - Untouched forest
 ```{r P08_6, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P08_6"
-pnm <- " Natural - Untouched forrest"
-des <- ""
+pnm <- " Natural - Untouched forest"
+des <- "Samples from untouched forests (urørt skov). The samples are part of other studies on soil and biodiversity."
 ext <- ""
-peo <- ""
-res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+peo <- "Mogens Humlegaard Greve <greve@agro.au.dk>; Lis Wollesen de Jonge <lis.w.de.jonge@agro.au.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
+com <- "Publications: This will be part of AU collaborations – likely with joint publication on this dataset and other forests. Check if the 107 samples and the new 250 are the same project (kvadratnet?) – see P23_1"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -954,11 +955,11 @@ cat(res, sep = "\t")
 ```{r P08_7, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P08_7"
 pnm <- " Natural - ??"
-des <- ""
+des <- "AC extended"
 ext <- ""
-peo <- ""
-res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+peo <- "Anne-Cathrine Storgaard Danielsen <acsd@agro.au.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
+com <- "GPS are wrong, but are related to P08_2 (individual samples from AC). Keep just on of the two?"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -994,12 +995,12 @@ cat(res, sep = "\t")
 ## P09_1: Lakes - Habitat Vision
 ```{r P09_1, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P09_1"
-des <- ""
+des <- "Samples from sediments from many lakes across DK."
 pnm <- "Lakes - Habitat Vision"
 ext <- ""
-peo <- ""
+peo <- "Erik Aude <eau@habitatvision.dk>; Lene Thomsen <lt@habitatvision.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Lakes sampled by Habitat Vision."
+com <- "Lakes sampled by Habitat Vision. Publication: No agreements – perhaps together with Urban_ponds (P05_2) + others on \"freshwaters\" (ponds, streams, highway)"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1022,11 +1023,11 @@ cat(res, sep = "\t")
 ```{r P09_2, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P09_2"
 pnm <- "Lakes - Ponderfull"
-des <- ""
+des <- "Arhus Uni has a project \"Ponderful\" where they sample from 30 small ponds (vandhul) – to look for cable bacteria"
 ext <- ""
-peo <- ""
+peo <- "Ian Marshall <ianpgm@bio.au.dk>; Kasper Urup Kjeldsen <kasperuk@bio.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Publications: Likely not, if so AU lead."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1049,11 +1050,11 @@ cat(res, sep = "\t")
 ```{r P10_1, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P10_1"
 pnm <- "Streams - Habitat Vision"
-des <- "Sediment samples streams. Different classification of stream condition than for project P10_2 (possible to combine all into one story."
+des <- "Sediment samples streams. Different classification of stream condition than for project P10_2."
 ext <- ""
-peo <- ""
+peo <- "Erik Aude <eau@habitatvision.dk>; Lene Thomsen <lt@habitatvision.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Habitat Vision, responsible name/email needed"
+com <- "Publications: Likely not. Perhaps with P05_2, P10_2 and other on \"freshwater\"."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1078,9 +1079,9 @@ pid <- "P10_2"
 pnm <- "Streams - DVFI"
 des <- "Sediment samples streams. From DVFI stations, and collected in spring to be comparable to DVFI results. A lot of very specific additional data collected in field Sampling only in spring."
 ext <- ""
-peo <- "Jeppe Lund Nielsen <jln@bio.aau.dk>"
+peo <- "Jeppe Lund Nielsen <jln@bio.aau.dk>; Nadieh de Jonge <ndj@bio.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Double-check responsible person"
+com <- "Publications: Potentially joint publication. Jeppe/Nadieh lead"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1131,7 +1132,7 @@ cat(res, sep = "\t")
 ```{r P11_1, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P11_1"
 pnm <- "Coasts - students"
-des <- "Other stream samples collected by MFD/students (without additional classification needed for the big projects)."
+des <- "Investigate microorganisms at different salinity (Kattegat vs Skagerak). NB: extraction of sand sediment did not yield sufficient DNA – instead based on Fastprep DNA extraction (not comparable with other projects)"
 ext <- ""
 peo <- ""
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
@@ -1158,11 +1159,11 @@ cat(res, sep = "\t")
 ```{r P11_2, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P11_2"
 pnm <- "Coasts and Fjords - Philip"
-des <- "Other stream samples collected by MFD/students (without additional classification needed for the big projects)."
+des <- "Other stream samples collected by MFD/students (without additional classification needed for the big projects). 160 DNA extractions of sediment samples collected in the COAST_SEQUENCE project at AU. See also https://bio.au.dk/en/research/research-areas/biodiversity/marine-life-around-denmark"
 ext <- ""
-peo <- ""
+peo <- "Philip Francis Thomsen <pfthomsen@bio.au.dk>; Martin Johannesen Klepke <martinjk@bio.au.dk>; Marie Vestergård <mv@bio.au.dk"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Publications: Yes, joint publication. MOU is signed. AU lead."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1195,7 +1196,7 @@ des <- "Investigate microorganisms in water and sediment from Danish Fjords."
 ext <- ""
 peo <- "Niels Iversen <ni@bio.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Add method on how samples were taken."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1219,11 +1220,11 @@ cat(res, sep = "\t")
 ```{r P12_1, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P12_1"
 pnm <- "Deep Sea - Aarhus"
-des <- "Kasper: 30 samples, where extensive geochemical metadata is awailable, as well as 16S rRNA amplicon seq and qPCR. Samples from the sulfate-methane transition zone. MFD contribute possibility of making FISH probes via full operon seq.Ian: deep sediments from IODP togt in 2013, where focus have been on hunting for cablebacteria."
+des <- "Kasper: 30 samples, where extensive geochemical metadata is awailable, as well as 16S rRNA amplicon seq and qPCR. Samples from the sulfate-methane transition zone. MFD contribute possibility of making FISH probes via full operon seq. Ian: deep sediments from IODP togt in 2013, where focus have been on hunting for cablebacteria. Initially, we got DNA from 60 sediment samples from 6 sites. However, the sequencing did not work. New project: Samples from 5 stations and 3-4 depths are sampled (extracted DNA delivered February 2023). Extraction procedure to follow. The samples are from the sulfate-methane transition zone, primarily to look for ANME. The project also contains a part with deep sequencing (Caitlin) to obtain ANME MAGs. "
 ext <- ""
 peo <- "Kasper Urup Kjeldsen <kasperuk@bio.au.dk>; Ian Marshall <ianpgm@bio.au.dk>"
-res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Caitlin Margaret Singleton <cms@bio.aau.dk>"
+com <- "The ANME part is in a separate project with deep sequencing (Caitlin). Samples received as DNA from phenol-chloroform extraction – worked really bad. Publications: joint pub on ANME (AU lead)"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1251,11 +1252,11 @@ cat(res, sep = "\t")
 ```{r P12_2, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P12_2"
 pnm <- "Deep Sea - Aarhus"
-des <- ""
+des <- "Deep sediments from IODP cruise in 2013, where focus has been on hunting for cable bacteria"
 ext <- ""
-peo <- "Kasper Urup Kjeldsen <kasperuk@bio.au.dk>"
+peo <- "Kasper Urup Kjeldsen <kasperuk@bio.au.dk>; Ian Marshall <ianpgm@bio.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Publications: Likely none"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1281,11 +1282,11 @@ cat(res, sep = "\t")
 ```{r P12_3, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P12_3"
 pnm <- "Fjords - Aarhus"
-des <- ""
+des <- "Seabed Mariager fjord"
 ext <- ""
 peo <- "Ian Marshall <ianpgm@bio.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Fill in description with methods."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1309,11 +1310,11 @@ cat(res, sep = "\t")
 ```{r P12_4, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P12_4"
 pnm <- "Deep Sea - SDU"
-des <- "Deep sea samples."
+des <- "Samples from the deep trenches (> 5000 m depths). Compare microbial communities in different trenches and different depth."
 ext <- ""
-peo <- "Clemens Schauberger <schauberger@biology.sdu.dk>"
+peo <- "Ronnie Glud <rnglud@biology.sdu.dk>, Clemens Schauberger <schauberger@biology.sdu.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Ronnie Glud <rnglud@biology.sdu.dk>"
-com <- ""
+com <- "Close project – don’t include in MFD."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1340,11 +1341,11 @@ cat(res, sep = "\t")
 ```{r P13_1, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P13_1"
 pnm <- "Urban - Influent Wastewater"
-des <- "Influent wastewater samples. Compare wastewater inlet to sludge from receiving WWTP’s. Samples have already been analyzed by 16S rRNA amplicon seq."
+des <- "Influent wastewater samples. Compare wastewater inlet to sludge from receiving WWTP’s. Samples have already been analyzed by 16S rRNA amplicon seq. Influent wastewater samples. Compare wastewater inlet to activated sludge from corresponding WWTPs. Samples have already been analyzed by 16S rRNA amplicon seq. Most samples are pooled from 10 day samples (24h flow proportional) over 3 weeks. The goal is to look for diversity across DK, importance of immigration, any geographical pattern. "
 ext <- ""
-peo <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+peo <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Marta Anna Nierychlo <mni@bio.aau.dk>; Giulia Dottorini <gd@bio.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "We should add additional 13 MiDAS plants. Add extraction method + pooling, etc. to description."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1368,11 +1369,11 @@ cat(res, sep = "\t")
 ```{r P13_2, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P13_2"
 pnm <- "Urban - AS Wastewater"
-des <- "Activated sludge wastewater samples."
+des <- "Corresponding activated sludge samples to influent samples P13_1. Most samples are pooled from 10 grab samples over 3 weeks. The goal is to look for diversity across DK, importance of immigration, any geographical pattern. Samples have already been analyzed by 16S rRNA amplicon seq."
 ext <- ""
-peo <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
+peo <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Marta Anna Nierychlo <mni@bio.aau.dk>; Giulia Dottorini <gd@bio.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "We should add additional 14 MiDAS plants. Add extraction method etc. to description."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1424,11 +1425,11 @@ cat(res, sep = "\t")
 ```{r P16_2, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P16_2"
 pnm <- "Urban - Drinking water"
-des <- ""
+des <- "Samples collected from water treatment plants. Filtered onto filters."
 ext <- ""
-peo <- ""
+peo <- "Horsens Torben Lund Skovhus <tols@via.dk>; Ditte Andreasen Søborg <DANS@via.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Publication: likely not. If so VIA lead. Very varying results for prep and sequencing. Sampling dates exist but have to be fetched."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1452,11 +1453,11 @@ cat(res, sep = "\t")
 ```{r P16_3, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P16_3"
 pnm <- "Urban - Drinking water"
-des <- ""
+des <- "Sjælland: Samples collected from water treatment plants (water works). Filtered onto filters."
 ext <- ""
-peo <- "Barth F. Smets <bfsm@dtu.dk>"
+peo <- "Barth F. Smets <bfsm@dtu.dk>; Marlene Mark Jensen <mmaj@env.dtu.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Publication: likely not. If so, DTU lead."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1486,7 +1487,7 @@ des <- "Soil collected from Danish cities across Denmark, up to 3 soil samples f
 ext <- ""
 peo <- ""
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "People Erika Dvarionaite and Amalie Berg-Mortensen (their emails need to be retrieved). Publication:  likely not as \"stand alone\" – perhaps part of larger soil paper?"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1513,9 +1514,9 @@ cat(res, sep = "\t")
 ```{r P18_1, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P18_1"
 pnm <- "Urban - Harbour"
-des <- ""
-ext <- ""
-peo <- ""
+des <- "Harbors around DK, surfaces are scraped of stone, tree. To be handled as sediment. To be used for other investigations at DTU. Are interested in BGC-producers, such as Phaeobacter or Pseudoalteromonas. Student helpers Majbrit and Camilla."
+ext <- "Salinity, temperature etc."
+peo <- "Lone Gram, <gram@bio.dtu.dk>; Peter Bing Svendsen, <pesven@dtu.dk>; Morten Dencker Schostag <mdesc@dtu.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
 com <- "Should be an <urban> project instead?"
 
@@ -1541,11 +1542,11 @@ cat(res, sep = "\t")
 ```{r P19_1, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P19_1"
 pnm <- "Urban - Archaeological"
-des <- ""
+des <- "Samples from excavations (1000 year old)"
 ext <- ""
 peo <- "Torsten Nygård Kristensen <tnk@bio.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Publication: Likely not. No metadata added yet."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1578,4 +1579,16 @@ print_internal_map(data_table = mfd_projects, fname = paste0(reformat.metadata.p
 ### Write mfd db
 ```{r, warning=T, echo=eval_debug, eval=T}
 writexl::write_xlsx(mfd_db, path = paste0(reformat.metadata.path, "/mfd_db.xlsx"))
+```
+
+## Write releases
+
+### Write project map
+```{r, warning=T, echo=eval_debug, eval=eval_release}
+print_internal_map(data_table = mfd_projects, fname = paste0(releases.path, "/", Sys.Date(), "_mfd_projects.xlsx"))
+```
+
+### Write mfd db
+```{r, warning=T, echo=eval_debug, eval=eval_release}
+writexl::write_xlsx(mfd_db[,release_indices], path = paste0(releases.path, "/", Sys.Date(), "_mfd_db.xlsx"))
 ```

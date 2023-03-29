@@ -1,0 +1,151 @@
+---
+title: "Comparison of MFD metadata releases"
+author: "F. Delogu"
+date: "as.Date(now())"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+    toc_collapsed: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+params:
+  debug: no
+---
+
+<style type="text/css">
+body, td {
+   font-size: 10pt;
+   text-align: justify
+}
+code.r{
+  font-size: 8pt;
+}
+pre {
+  font-size: 8pt
+}
+</style>
+
+# Setup
+
+## Load libraries
+```{r load libraries, message=F, warning=F, echo=params$debug}
+library(tidyverse)
+library(openxlsx)
+library(knitr)
+
+options(width = 500)
+```
+
+## Set the environment
+```{r setup, echo=params$debug}
+options(stringsAsFactors = F, gsubfn.engine = "R")
+
+Sys.setenv("LANGUAGE"="En")
+
+wd <- getwd()
+
+releases.path <- paste0(wd, '/../../analysis/releases')
+downloads.path <- paste0(wd, '/../../data/downloads')
+
+eval_debug <- params$debug
+```
+
+This section is meant for internal use and debugging, if you are interest in seeing the code please knit again the document setting the "debug" flag to "true". 
+
+For the generation of this document the parameters were set as:
+```{r print params, echo=eval_debug}
+data.frame(param=c("debug"), value=c(eval_debug)) %>%
+  kable()
+```
+
+## Custom functions
+
+### Load functions
+```{r load custom functions, message=F, warning=F, echo=eval_debug}
+source(paste0(wd, "/mfd_report_test_routine.R"))
+```
+
+## Load data
+
+### Read data table
+Read al the time-stamped MfD metadata releases
+```{r, echo=eval_debug}
+file.paths <- list.files(releases.path, pattern="*.xlsx", full.names=TRUE)
+tables <- lapply(file.paths, read.xlsx)
+fnames <- basename(file.paths)
+```
+
+### Split and retrieve time stamps
+```{r, echo=eval_debug}
+dates.db <- str_remove(fnames[grep("mfd_db", fnames)], "_mfd_db.xlsx")
+tables.db <- tables[grep("mfd_db", fnames)]
+```
+
+# Analysis
+
+## Summary of releases
+```{r, echo=eval_debug, warning=F, message=F}
+union.names <- reduce(lapply(tables.db, names), union)
+names.order <- c("fieldsample_barcode", "sample_type", "received", "sampling_date", "latitude", "longitude", "habitat_type", "habitat_typenumber", "sitename", "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3", "sampling_comment", "project_id")
+
+tables.summ <- list()
+
+summ.indices <- function(data_table, date_release, indices=NA){
+  tmp <- names(data_table)
+  tmp <- indices[indices%in%tmp]
+  tmp <- summarise_metadata(data_table, indices=tmp) %>% select(field, present, `present [%]`) %>% `colnames<-`(c("field", paste0(date_release, " [N]"), paste0(date_release, " [%]")))
+  return(tmp)
+}
+
+tables.summ <- reduce(mapply(summ.indices, tables.db, dates.db, MoreArgs=list(indices=names.order), SIMPLIFY = F), full_join) %>%
+  arrange(factor(field, levels=names.order))
+
+tables.summ %>% kable(digits = 1)
+```
+
+## Differences of releases
+```{r, echo=eval_debug, warning=F, message=F}
+names.summ <- names(tables.summ)
+
+diff.names <- c()
+diff.cols <- c()
+for(i in 4:length(tables.summ)){
+
+    split.name <- unlist(str_split(names.summ[i] , " "))
+  new.name <- paste0(split.name[1], " Δ ", split.name[2])
+  diff.names <- c(diff.names, new.name)
+
+  j <- i - 2
+  diff.cols <- c(diff.cols, tables.summ[,i] - tables.summ[,j])
+}
+
+diff.cols <- as.data.frame(diff.cols)
+colnames(diff.cols) <- diff.names
+
+new.names <- c()
+new.names <- c(new.names, names.summ[1:3])
+for(i in 4:length(tables.summ)){
+  new.names <- c(new.names, names.summ[i])
+  new.names <- c(new.names, diff.names[i-3])
+}
+
+tables.summ <- cbind(tables.summ, diff.cols)[,new.names]
+
+tables.summ %>% kable(digits = 1)
+```
+
+# Output
+
+## Print difference tables
+```{r, echo=eval_debug, warning=F, message=F}
+wb <- openxlsx::createWorkbook()
+    
+openxlsx::addWorksheet(wb, "variables")
+header_style <- openxlsx::createStyle(textDecoration = "Bold")
+openxlsx::writeData(wb, "variables", tables.summ, headerStyle = header_style)
+
+openxlsx::saveWorkbook(wb, paste0(releases.path, "/", unlist(str_split(names.summ[length(names.summ)], " "))[1], "_diff.xlsx"))
+```

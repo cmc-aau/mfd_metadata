@@ -1,8 +1,8 @@
-To: 
+To: Henning Carlo Thomsen <henning.thomsen@agro.au.dk>, Bent Tolstrup Christensen <bent.t.christensen@agro.au.dk>, Albert Vejlin Stefansen <albert_stefansen@hotmail.com>, Andrew Giguere <andrew.giguere@univie.ac.at>
 Object: Agriculture - Aaskov data collab
 
 
-Dear ,
+Dear Henning and Bent and Albert and Andrew,
 
 I am writing you about the Agriculture - Aaskov data collaboration. We were reviewing the data in order to proceed with the analysis and we realised that some entries are missing (i.e. from variables: fieldsample_barcode, sample_type, sampling_date, latitude, longitude, habitat_type, habitat_typenumber, sitename, mfd_sampletype, mfd_areatype, mfd_hab1, mfd_hab2 and mfd_hab3).
 

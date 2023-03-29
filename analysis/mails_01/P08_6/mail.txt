@@ -1,10 +1,10 @@
-To: 
-Object:  Natural - Untouched forrest data collab
+To: Mogens Humlegaard Greve <greve@agro.au.dk>, Lis Wollesen de Jonge <lis.w.de.jonge@agro.au.dk>
+Object:  Natural - Untouched forest data collab
 
 
-Dear ,
+Dear Mogens and Lis,
 
-I am writing you about the  Natural - Untouched forrest data collaboration. We were reviewing the data in order to proceed with the analysis and we realised that some entries are missing (i.e. from variables: fieldsample_barcode, sample_type, sampling_date, latitude, longitude, habitat_type, habitat_typenumber, sitename, mfd_sampletype, mfd_areatype, mfd_hab1, mfd_hab2 and mfd_hab3).
+I am writing you about the  Natural - Untouched forest data collaboration. We were reviewing the data in order to proceed with the analysis and we realised that some entries are missing (i.e. from variables: fieldsample_barcode, sample_type, sampling_date, latitude, longitude, habitat_type, habitat_typenumber, sitename, mfd_sampletype, mfd_areatype, mfd_hab1, mfd_hab2 and mfd_hab3).
 
 Could you please fill in the missing entires (if you are able to retrieve them) in the attached file "table_to_fill.xlsx"? The complete table should look like the extract "example_table.xlsx".
 In the "table_to_fill.xlsx" the first sheet (called variables) contains the data whilst the second one (called description) explains each variable and what kind of input is needed from your side. The "variables" sheet includes the missing entries for which your input is needed (highlighted in green), as well as the missing entries that will be automatically filled by us (highlighted in orange) given your input on the variable "habitat_typenumber". We included the ontology file ("2022-11-28_mfd-habitat-ontology.xlsx") to help in choosing the most descriptive habitat_typenumber.

@@ -1,4 +1,4 @@
-To: Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>, Rasmus Ejrnæs <rasmus@bios.au.dk>
+To: Tobias Guldberg Frøslev <tfroeslev@gbif.org>, Rasmus Ejrnæs <rasmus@bios.au.dk>
 Object: Biowide - River valleys data collab
 
 

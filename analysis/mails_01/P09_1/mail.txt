@@ -1,8 +1,8 @@
-To: 
+To: Erik Aude <eau@habitatvision.dk>, Lene Thomsen <lt@habitatvision.dk>
 Object: Lakes - Habitat Vision data collab
 
 
-Dear ,
+Dear Erik and Lene,
 
 I am writing you about the Lakes - Habitat Vision data collaboration. We were reviewing the data in order to proceed with the analysis and we realised that some entries are missing (i.e. from variables: fieldsample_barcode, sample_type, sampling_date, latitude, longitude, habitat_type, habitat_typenumber, sitename, mfd_sampletype, mfd_areatype, mfd_hab1, mfd_hab2 and mfd_hab3).
 

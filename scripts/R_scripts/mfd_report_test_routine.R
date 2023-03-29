@@ -139,7 +139,14 @@ summarise_missing_metadata <- function(data_table = NA){
   }
 }
 
-summarise_metadata <- function(data_table = NA){
+summarise_metadata <- function(data_table = NA, indices = NA){
+  if(class(indices)!="character"){
+    indices <- colnames(data_table)
+  }
+  
+  data_table <- data_table %>%
+    select(indices)
+  
   N <- nrow(data_table)
   dd <- data_table %>%
     summarise_all(funs(sum(!is.na(.)))) %>%

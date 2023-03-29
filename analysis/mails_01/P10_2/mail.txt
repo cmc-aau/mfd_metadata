@@ -1,8 +1,8 @@
-To: Jeppe Lund Nielsen <jln@bio.aau.dk>
+To: Jeppe Lund Nielsen <jln@bio.aau.dk>, Nadieh de Jonge <ndj@bio.aau.dk>
 Object: Streams - DVFI data collab
 
 
-Dear Jeppe,
+Dear Jeppe and Nadieh,
 
 I am writing you about the Streams - DVFI data collaboration. We were reviewing the data in order to proceed with the analysis and we realised that some entries are missing (i.e. from variables: fieldsample_barcode, sample_type, sampling_date, latitude, longitude, habitat_type, habitat_typenumber, sitename, mfd_sampletype, mfd_areatype, mfd_hab1, mfd_hab2 and mfd_hab3).
 

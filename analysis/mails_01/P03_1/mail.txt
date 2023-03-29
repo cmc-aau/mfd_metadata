@@ -1,4 +1,4 @@
-To: Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>
+To: Tobias Guldberg Frøslev <tfroeslev@gbif.org>
 Object: Biowide - Urban data collab
 
 
