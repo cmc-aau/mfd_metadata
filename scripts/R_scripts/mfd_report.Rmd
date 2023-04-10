@@ -153,7 +153,7 @@ rm(con, qry, executedQuery, token)
 mfd_db <- mfd_db0 %>%
   rowwise() %>%
   mutate(received=min(c(scanned, received), na.rm = T)) %>%                              # assume that the earliest date between received and scanned is the sampling date, if one is NA the other one is selected
-  #mutate(received = dmy_hms(received, truncated = 3) %>% format("%Y-%m-%d")) %>%        # format dates
+  mutate(received = dmy_hms(received, truncated = 3) %>% format("%Y-%m-%d")) %>%        # format dates
   ungroup() %>%
   select(-scanned) %>%
   #filter(str_detect(fieldsample_barcode, "^MFD")) %>%                                   # not filtering for strange (unmatched) barcodes
@@ -491,13 +491,20 @@ mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, r
 hab_correction <- readxl::read_excel(paste0(metadata.path, "/", pid, "/2022-11-28_mfd-metadata-kvnet.xlsx")) %>%
    separate(unified, into = c("a", "b", "kvnet_hab"), sep = "_") %>% select(-a, -b)
 
+mapping.project <- readxl::read_excel(paste0(metadata.path, "/", pid, "/mapping.xlsx")) %>%
+  filter(!is.na(MFD_id)) %>%
+  select(`Kvnet Punktnr`, MFD_id) %>%
+  as.data.frame()
+
 mfd_db <- mfd_db %>%
+  #tmp <- mfd_db_subproject %>%
   left_join(hab_correction, by = "fieldsample_barcode") %>%
   mutate(mfd_areatype       = ifelse(project_id == pid & habitat_type == "agriculture", "Agriculture", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
          habitat_typenumber = ifelse(project_id == pid, kvnet_hab, habitat_typenumber),
-         sampling_date      = ifelse(project_id == pid & received == "2020-10-30", "2020-02-14", sampling_date),
-         sampling_date      = ifelse(project_id == pid & received == "2021-03-15", "2021-02-14", sampling_date)) %>%
+         #sampling_date      = if_else(project_id == pid & received == "2020-10-30", "2020-02-14", sampling_date),
+         #sampling_date      = if_else(project_id == pid & received == "2021-03-15", "2021-02-14", sampling_date)) %>%
+         sampling_date = received) %>%
   add_ontology(ontology_path = ontology.path) %>%
   select(-kvnet_hab) %>%
   mutate(across(habitat_typenumber, ~str_remove(., "6099"))) %>%
@@ -955,11 +962,14 @@ cat(res, sep = "\t")
 ```{r P08_7, echo=F, message=F, warning=F, error=F, results='asis'}
 pid <- "P08_7"
 pnm <- " Natural - ??"
-des <- "AC extended"
+des <- "The samples were collected from six different habitat types from the European Habitats Directive, comprising three types of grasslands (Calcareous grassland, Acidic grassland, and Sandy grassland) and three types of heathlands (Dry heath, Wet heath and Fixed dune). A total of 19 different locations (three to four locations representing each habitat type) were examined (Fig. 1A). Within each location, field surveys were conducted in three different sites (Fig. 1B) to cover variation within each location. (with the exception of five locations, where it was only possible to examine two sites, due to the limited area of the habitat type in question). Each site consisted of a circle with a radius of 5 meters (= 78.5 m2). A minimum distance of 20 meters was kept between sites. All field surveys were conducted in August and September 2020.
+Prior to the collection of soil samples, botanical surveys were conducted by determining all species rooted within the site (complete species list, presence/absence) and positioning three pinpoint frames to analyse the frequency of the plant species within the area of the pinpoint frame. Soil samples (depth 0-16 cm) were collected at the centre of each pinpoint frame (the squares with crosses on Fig. 1C), after removal of vegetation and litter, and kept in a cool box. A subset of the three collected samples per site were pooled (resulting in the 55 soil samples in P08_2) but the rest was kept as single-samples (the 132 samples from this excel-file). Originally there were 165 single-samples, but some of them were discarded and therefore not sequenced or included in the metadata."
 ext <- ""
 peo <- "Anne-Cathrine Storgaard Danielsen <acsd@agro.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
 com <- "GPS are wrong, but are related to P08_2 (individual samples from AC). Keep just on of the two?"
+
+figure1.text <- "Figure 1: The geographical location of study areas (A), illustration of the sampling design within each location (B and C) and images of the habitat types (D) taken by the first author during field work. Each coloured circle on the map corresponds to one location. In five areas, the locations were located to close to show on the map, these locations are connected by a colourless circle and the connected locations were located in the centre of the colourless circle. Each coloured circle on (A), corresponds to the polygon seen on (B). The three circles within this polygon (B), illustrates the three sites in which field surveys were conducted. One of these sites is illustrated on (C) where the squares indicate pinpoint frames and x marks where soil samples were collected."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -989,8 +999,11 @@ mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
 
 res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+
 cat(res, sep = "\t")
 ```
+
+![`r figure1.text`](`r paste0(metadata.path, "/P08_7/sampling_locations.png")`)
 
 ## P09_1: Lakes - Habitat Vision
 ```{r P09_1, echo=F, message=F, warning=F, error=F, results='asis'}
