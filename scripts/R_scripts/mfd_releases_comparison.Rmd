@@ -141,6 +141,11 @@ tables.summ %>% kable(digits = 1)
 
 ## Print difference tables
 ```{r, echo=eval_debug, warning=F, message=F}
+
+if(file.exists(paste0(releases.path, "/", unlist(str_split(names.summ[length(names.summ)], " "))[1], "_diff.xlsx"))){
+    file.remove(paste0(releases.path, "/", unlist(str_split(names.summ[length(names.summ)], " "))[1], "_diff.xlsx"))
+}
+
 wb <- openxlsx::createWorkbook()
     
 openxlsx::addWorksheet(wb, "variables")
@@ -148,4 +153,22 @@ header_style <- openxlsx::createStyle(textDecoration = "Bold")
 openxlsx::writeData(wb, "variables", tables.summ, headerStyle = header_style)
 
 openxlsx::saveWorkbook(wb, paste0(releases.path, "/", unlist(str_split(names.summ[length(names.summ)], " "))[1], "_diff.xlsx"))
+```
+
+## Plot time-courses
+```{r, echo=eval_debug, warning=F, message=F}
+entires.time <- tables.summ %>%
+  filter(field%in%c("sampling_date", "latitude", "longitude", "sitename", "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3")) %>%
+  pivot_longer(-field) %>%
+  filter(!str_detect(name, "Δ")) %>%
+  separate(name, into = c("name", "unit"), sep = " ") %>%
+  filter(unit=="[N]") %>%
+  ggplot(aes(x=name, y=value, group=field, color=field)) +
+  geom_line() +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 0.5, vjust = 0.5)) +
+  labs(x="Release date", y="Filled entries")
+
+entires.time
+ggsave(paste0(releases.path, "/entires_time.png"), entires.time, width = 8, height = 3.75)
 ```

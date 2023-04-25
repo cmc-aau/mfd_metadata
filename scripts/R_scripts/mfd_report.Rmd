@@ -15,7 +15,7 @@ params:
   debug: no
   debug2: no
   internal: yes
-  release: no
+  release: yes
 ---
 
 <style type="text/css">
@@ -152,8 +152,9 @@ rm(con, qry, executedQuery, token)
 ```{r curate mfd project, echo=eval_debug}
 mfd_db <- mfd_db0 %>%
   rowwise() %>%
-  mutate(received=min(c(scanned, received), na.rm = T)) %>%                              # assume that the earliest date between received and scanned is the sampling date, if one is NA the other one is selected
   mutate(received = dmy_hms(received, truncated = 3) %>% format("%Y-%m-%d")) %>%        # format dates
+  mutate(scanned = dmy_hms(scanned, truncated = 3) %>% format("%Y-%m-%d")) %>%        # format dates
+  mutate(received=min(c(scanned, received), na.rm = T)) %>%                              # assume that the earliest date between received and scanned is the sampling date, if one is NA the other one is selected
   ungroup() %>%
   select(-scanned) %>%
   #filter(str_detect(fieldsample_barcode, "^MFD")) %>%                                   # not filtering for strange (unmatched) barcodes
@@ -375,7 +376,7 @@ des <- "Related the soil tracker project, see \"Treated like dirt: Robust forens
 ext <- ""
 peo <- "Tobias Guldberg Frøslev <tfroeslev@gbif.org>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publications: So far unclear if we should make dedicated joint publication on this dataset."
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -419,7 +420,7 @@ des <- "Samples from potato fields looking at potato diseases. Not possible to g
 ext <- ""
 peo <- "Kåre Lehman Nielsen <kln@bio.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Close project – data cannot be used. Remove data from database – cannot be released."
+com <- "Not to be included in MfD"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -452,17 +453,30 @@ des <- "Samples from the Aaskov research station with the aim of looking at soil
 ext <- ""
 peo <- "Henning Carlo Thomsen <henning.thomsen@agro.au.dk>; Bent Tolstrup Christensen <bent.t.christensen@agro.au.dk>; Albert Vejlin Stefansen <albert_stefansen@hotmail.com>; Andrew Giguere <andrew.giguere@univie.ac.at>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publications:  Andrew has one in preparation"
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
 
+filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P04_2_filled_table.xlsx")) %>%
+  mutate(correct_date = ymd(sampling_date) %>% format("%Y-%m-%d"),
+         correct_habitat_typenumber = habitat_typenumber) %>%
+  select(fieldsample_barcode,
+         correct_date,
+         correct_habitat_typenumber)
+
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Agriculture", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
-         sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
-  add_ontology(ontology_path = ontology.path)
+         sampling_date      = ifelse(project_id == pid, NA, sampling_date),
+         habitat_typenumber = ifelse(project_id == pid, NA, habitat_typenumber)) %>%
+  left_join(filled.table) %>%
+  mutate(sampling_date       = ifelse(project_id == pid, correct_date, sampling_date),
+         habitat_typenumber = ifelse(project_id == pid, correct_habitat_typenumber, habitat_typenumber)) %>%
+  add_ontology(ontology_path = ontology.path) %>%
+  select(-correct_date,
+         -correct_habitat_typenumber)
 
 paragraph2 <- paste0("Could you please provide the grid position as the sitename?\n",
                      "For all samples, do you have information on the crop type or can you chose from the attached ontology file?")
@@ -493,11 +507,11 @@ hab_correction <- readxl::read_excel(paste0(metadata.path, "/", pid, "/2022-11-2
 
 mapping.project <- readxl::read_excel(paste0(metadata.path, "/", pid, "/mapping.xlsx")) %>%
   filter(!is.na(MFD_id)) %>%
+  filter(`Kvnet Punktnr`!="Ikke Kvnet") %>%
   select(`Kvnet Punktnr`, MFD_id) %>%
   as.data.frame()
 
 mfd_db <- mfd_db %>%
-  #tmp <- mfd_db_subproject %>%
   left_join(hab_correction, by = "fieldsample_barcode") %>%
   mutate(mfd_areatype       = ifelse(project_id == pid & habitat_type == "agriculture", "Agriculture", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
@@ -508,7 +522,12 @@ mfd_db <- mfd_db %>%
   add_ontology(ontology_path = ontology.path) %>%
   select(-kvnet_hab) %>%
   mutate(across(habitat_typenumber, ~str_remove(., "6099"))) %>%
-  mutate(across(habitat_typenumber, ~str_remove(., "6000")))
+  mutate(across(habitat_typenumber, ~str_remove(., "6000"))) %>%
+  left_join((mapping.project %>%
+               `colnames<-`(c("kvnet_punktnr", "fieldsample_barcode"))),
+             by = "fieldsample_barcode") %>%
+  mutate(sitename           = if_else(project_id == pid, paste0("kvnet_punktnr_", kvnet_punktnr), sitename)) %>%
+  select(-kvnet_punktnr)
 
 paragraph2 <- "Were the pairs of samples, sampled the same day, exactly one year apart (as it looks like from the sampling_date column)?"
 
@@ -527,18 +546,32 @@ des <- "Student project aimed to analyze conventional vs. ecological agriculture
 ext <- ""
 peo <- ""
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publications: none – dataset is just part of MfD"
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
 
+unrecoverable.samples <- c("MFD04003", # We'll not retrieve more info from those samples
+                           "MFD04004",
+                           "MFD04014",
+                           "MFD04020",
+                           "MFD04032",
+                           "MFD04044",
+                           "MFD04056",
+                           "MFD04069",
+                           "MFD04081",
+                           "MFD04105",
+                           "MFD04128")
+
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Agriculture", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
          sampling_date      = if_else(project_id == pid, received, sampling_date),
-         sampling_date      = ifelse(project_id == pid & str_detect(sampling_comment, "kvadratnet"), NA, sampling_date)) %>%
-  add_ontology(ontology_path = ontology.path)
+         sampling_date      = ifelse(project_id == pid & str_detect(sampling_comment, "kvadratnet"), NA, sampling_date),
+         habitat_typenumber = ifelse(project_id == pid, NA, habitat_typenumber)) %>%
+  add_ontology(ontology_path = ontology.path) %>%
+  filter(!fieldsample_barcode %in% unrecoverable.samples)
 
 paragraph2 <- paste0("Could you please provide the grid position as the sitename?\n",
                      "For all samples, do you have information on the crop type or can you chose from the attached ontology file?")
@@ -548,6 +581,7 @@ N <- nrow(mfd_db_subproject)
 
 res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
 cat(res, sep = "\t")
+rm(unrecoverable.samples)
 ```
 
 ## P04_5: Agriculture - Seges
@@ -558,7 +592,7 @@ des <- "Agricultural soil collected by farms after harvest, dried and used for n
 ext <- "Soil parameters and historic crop data."
 peo <- "Camilla Lemming <cal@seges.dk>; Rita Hørfarter <rih@seges.dk>; Ole Kristensen <oklab@mail.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publications: It is likely that we could make dedicated joint publication on this dataset. "
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -601,7 +635,7 @@ des <- "Investigate peatlands (areas with waterlogged conditions), which prevent
 ext <- ""
 peo <- "Lis Wollesen de Jonge <lis.w.de.jonge@agro.au.dk>; Anne-Cathrine Storgaard Danielsen <acsd@agro.au.dk>; Cecilie Hermansen <cecilie.hermansen@agro.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publications: This will be part of AU collaborations with joint publication on this dataset"
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -616,6 +650,15 @@ mfd_db <- mfd_db %>%
          habitat_typenumber = ifelse(project_id == pid& str_detect(sampling_comment, "raps"), "6710", habitat_typenumber),
          sampling_date      = ifelse(project_id == pid, "2021-07-01", sampling_date)) %>%
   add_ontology(ontology_path = ontology.path)
+
+filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P04_6_filled_table.xlsx")) %>%
+  mutate(correct_sitename = sitename) %>%
+  select(fieldsample_barcode, correct_sitename)
+
+mfd_db <- left_join(mfd_db, filled.table,
+                 by="fieldsample_barcode") %>%
+  mutate(sitename      = ifelse(project_id == pid, correct_sitename, sitename)) %>%
+  select(-correct_sitename)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
@@ -632,16 +675,24 @@ des <- "Investigate soil samples from 3 farmers about effect of organically grow
 ext <- ""
 peo <- "Jørgen Friis Pedersen <friisnibe@gmail.com>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "No publications. We have promised to send an overview of microbes in the samples - to look for potential major differences."
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
 
+filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P04_7_filled_table.xlsx")) %>%
+  separate(habitat_typenumber, into=c("f1", "f2", "habitat_typenumber")) %>%
+  mutate(correct_habitat_typenumber = habitat_typenumber) %>%
+  select(fieldsample_barcode, correct_habitat_typenumber)
+
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Agriculture", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
          sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
+  left_join(filled.table) %>%
+  mutate(habitat_typenumber = ifelse(project_id == pid, correct_habitat_typenumber, habitat_typenumber)) %>%
+  select(-correct_habitat_typenumber) %>%
   add_ontology(ontology_path = ontology.path)
 
 paragraph2 <- "Could you please provide us with a habitat_typenumber per sample that matches the ones on the attached ontology (or suggest new ones follwoing the same scheme)."
@@ -661,7 +712,7 @@ des <- "Investigate microorganisms and heavy metals in rainwater basins across D
 ext <- ""
 peo <- "Jes Vollertsen <jesvollertsen@build.aau.dk>; Dian Stephansen <dast@build.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Marta Anna Nierychlo <mni@bio.aau.dk>"
-com <- "In theory the dried sampels are not sediment, but soil samples. Does not fit the ontology scheme. Publication: Agreement on one joint paper on rainwater basins, metals and microbes. Dian S. driving force."
+com <- "In theory the dried sampels are not sediment, but soil samples. Double check with the ontology scheme."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -693,7 +744,7 @@ des <- "The goal was to get samples to MfD from \"urban\" waters, they may have 
 ext <- ""
 peo <- ""
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "The responisble people are Erika Dvarionaite and Amalie Berg-Mortensen (email to be found). Publications: So far unclear if we should make dedicated publication on this dataset. Likely not. Could perhaps go together with data from all MfD lakes (P09_1)."
+com <- "The responisble people are Erika Dvarionaite and Amalie Berg-Mortensen (email to be found). Could perhaps go together with data from all MfD lakes (P09_1)."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -723,7 +774,7 @@ des <- "Part of \"Biomap\" project at AU (to develop the use of electrical field
 ext <- ""
 peo <- "Andreas Schramm <andreas.schramm@bio.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "No GPS on samples, estimated from sampling_comment where a city is mentioned. Project should be evaluated for future work."
+com <- "No GPS on samples, estimated from sampling_comment where a city is mentioned."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -760,7 +811,7 @@ des <- ""
 ext <- ""
 peo <- "Jeppe Lund Nielsen <jln@bio.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Should this project be closed? Method does not work well for the type of sample (came as DNA, extracted with FastSpin)."
+com <- "Double check methods for inclusion in MfD."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -790,7 +841,7 @@ des <- "One of our major projects with samples from >2500 natural habitats acros
 ext <- "Potentially - not inhouse currently."
 peo <- "Erik Aude <eau@habitatvision.dk>; Lene Thomsen <lt@habitatvision.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publication: Data for several publications. Need to be discussed which papers and lead authors."
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -798,10 +849,49 @@ mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, r
 
 rescued_samples <- c("\"D  5!5", "/F 0\"  2", "/FD!3 83", "/FD/3577", "/FDUP. 3", "2701", ">F&/4287", "M\"DO!Z X", "M\"DO45V5")
 
+filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P08_1_filled_table.xlsx")) %>%
+  filter(!is.na(MFD_nr))
+  
+mapping.project <- filled.table %>%
+  mutate(sample_name=`Relevé number`, sample_id=MFD_nr) %>%
+  select(sample_name, sample_id) %>%
+  as.data.frame()
+
+utmcoor <- SpatialPoints(cbind(as.numeric(gsub("'|D", "", filled.table$Utm_x)),
+                               as.numeric(gsub("'|D", "", filled.table$Ytm_y))),
+                         proj4string=CRS("+proj=utm +zone=32"))
+longlatcoor <- spTransform(utmcoor,CRS("+proj=longlat"))
+
+filled.table <- filled.table %>%
+  mutate(fieldsample_barcode = MFD_nr,
+         correct_latitude = round(longlatcoor$coords.x2, 4),
+         correct_longitude = round(longlatcoor$coords.x1, 4),
+         correct_sitename = Loknavn,
+         correct_date = format(ymd(`Date (year/month/day)`), "%Y-%m-%d"),
+         correct_habitat_typenumber = as.character(Naturnr)) %>%
+  select(fieldsample_barcode,
+         correct_latitude,
+         correct_longitude,
+         correct_sitename,
+         correct_date,
+         correct_habitat_typenumber)
+
 mfd_db <- mfd_db %>%
-  mutate(mfd_areatype       = ifelse(project_id == pid | fieldsample_barcode %in% rescued_samples, "Natural", mfd_areatype),
+  full_join(filled.table) %>%
+  mutate(project_id         = if_else(fieldsample_barcode %in% filled.table$fieldsample_barcode, pid, project_id),
+         mfd_areatype       = ifelse(project_id == pid | fieldsample_barcode %in% rescued_samples, "Natural", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid | fieldsample_barcode %in% rescued_samples, "Soil", mfd_sampletype),
-         sampling_date      = if_else(project_id == pid | fieldsample_barcode %in% rescued_samples, received, sampling_date)) %>%
+         #sampling_date      = if_else(project_id == pid | fieldsample_barcode %in% rescued_samples, received, sampling_date),
+         latitude           = if_else(project_id == pid, correct_latitude, latitude),
+         longitude          = if_else(project_id == pid, correct_longitude, longitude),
+         sitename           = if_else(project_id == pid, correct_sitename, sitename),
+         sampling_date      = if_else(project_id == pid, correct_date, sampling_date),
+         habitat_typenumber = if_else(project_id == pid, correct_habitat_typenumber, habitat_typenumber)) %>%
+  select(-correct_latitude,
+         -correct_longitude,
+         -correct_sitename,
+         -correct_date,
+         -correct_habitat_typenumber) %>%
   add_ontology(ontology_path = ontology.path)
 
 paragraph2 <- "Due to a malfunctioning of the barcode recognistion caused by the iOS update, for few samples we retrieved nonsensical MFD barcodes and we cannot link the samples to the correct ones. Could you please double-check in your data and link the samples with the right barcodes?"
@@ -821,7 +911,7 @@ des <- "Comparing micro and macro in selected habitat types. Two master projects
 ext <- ""
 peo <- "Dan Bruhn <db@bio.aau.dk>; Anne-Cathrine Storgaard Danielsen <acsd@agro.au.dk>; Lis Wollesen de Jonge <lis.w.de.jonge@agro.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Assuming dates are correct, but not sure. Publications: One paper is being written by Anne-Cathrine based on amplicon data."
+com <- "Assuming dates are correct, but not sure."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -848,7 +938,7 @@ des <- "Other master projects with natural samples."
 ext <- ""
 peo <- ""
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Figure out what projects are collapsed into this project. Add description of project."
+com <- "Collage of multiple sub-projects; needs to be separated."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -902,7 +992,7 @@ des <- "Collaboration about 750 samples for biodiversity studies in SustainScape
 ext <- ""
 peo <- "Signe Normand <signe.normand@bio.au.dk>; Urs Treier <urs.treier@bio.au.dk>; Bjarke Madsen <bjarke.madsen@bio.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
-com <- "Publications: This will be part of AU collaborations with joint publication on this dataset. We only have GPS and date – are these correct? Sampling points look very clustered."
+com <- "Double check GPS and date."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -938,7 +1028,7 @@ des <- "Samples from untouched forests (urørt skov). The samples are part of ot
 ext <- ""
 peo <- "Mogens Humlegaard Greve <greve@agro.au.dk>; Lis Wollesen de Jonge <lis.w.de.jonge@agro.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
-com <- "Publications: This will be part of AU collaborations – likely with joint publication on this dataset and other forests. Check if the 107 samples and the new 250 are the same project (kvadratnet?) – see P23_1"
+com <- "Check if the 107 samples and the new 250 are the same project (kvadratnet?) – see P23_1"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -950,6 +1040,20 @@ mfd_db <- mfd_db %>%
          habitat_typenumber = ifelse(project_id == pid, "9990", habitat_typenumber),
          sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
   add_ontology(ontology_path = ontology.path)
+
+filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P08_6_filled_table.xlsx")) %>%
+  mutate(correct_date = dmy(sampling_date) %>% format("%Y-%m-%d"),
+         correct_sitename = sitename) %>%
+  select(fieldsample_barcode,
+         correct_date,
+         correct_sitename)
+
+mfd_db <- left_join(mfd_db, filled.table,
+                 by="fieldsample_barcode") %>%
+  mutate(sampling_date      = if_else(project_id == pid, correct_date, sampling_date),
+         sitename           = if_else(project_id == pid, correct_sitename, sitename)) %>%
+  select(-correct_date,
+         -correct_sitename)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
@@ -1001,9 +1105,9 @@ N <- nrow(mfd_db_subproject)
 res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
 
 cat(res, sep = "\t")
-```
 
-![`r figure1.text`](`r paste0(metadata.path, "/P08_7/sampling_locations.png")`)
+#![`r figure1.text`](`r paste0(metadata.path, "/P08_7/sampling_locations.png")`)
+```
 
 ## P09_1: Lakes - Habitat Vision
 ```{r P09_1, echo=F, message=F, warning=F, error=F, results='asis'}
@@ -1013,16 +1117,53 @@ pnm <- "Lakes - Habitat Vision"
 ext <- ""
 peo <- "Erik Aude <eau@habitatvision.dk>; Lene Thomsen <lt@habitatvision.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Lakes sampled by Habitat Vision. Publication: No agreements – perhaps together with Urban_ponds (P05_2) + others on \"freshwaters\" (ponds, streams, highway)"
+com <- "Lakes sampled by Habitat Vision."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
 
+filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P09_1_filled_table.xlsx")) %>%
+  filter(!is.na(MFD_nr))
+
+mapping.project <- filled.table %>%
+  mutate(sample_name=`Relevé number`, sample_id=MFD_nr) %>%
+  select(sample_name, sample_id) %>%
+  as.data.frame()
+
+utmcoor <- SpatialPoints(cbind(filled.table$Utm_x, filled.table$Ytm_y), proj4string=CRS("+proj=utm +zone=32"))
+longlatcoor <- spTransform(utmcoor,CRS("+proj=longlat"))
+
+filled.table <- filled.table %>%
+  mutate(fieldsample_barcode = MFD_nr,
+         correct_latitude = longlatcoor$coords.x2,
+         correct_longitude = longlatcoor$coords.x1,
+         correct_sitename = Loknavn,
+         correct_date = format(ymd(`Date (year/month/day)`), "%Y-%m-%d"),
+         correct_habitat_typenumber = as.character(Naturnr)) %>%
+  select(fieldsample_barcode,
+         correct_latitude,
+         correct_longitude,
+         correct_sitename,
+         correct_date,
+         correct_habitat_typenumber)
+
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
          sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
+  full_join(filled.table) %>%
+  mutate(project_id         = if_else(fieldsample_barcode %in% filled.table$fieldsample_barcode, pid, project_id),
+         latitude           = if_else(project_id == pid, correct_latitude, latitude),
+         longitude          = if_else(project_id == pid, correct_longitude, longitude),
+         sitename           = if_else(project_id == pid, correct_sitename, sitename),
+         sampling_date      = if_else(project_id == pid, correct_date, sampling_date),
+         habitat_typenumber = if_else(project_id == pid, correct_habitat_typenumber, habitat_typenumber)) %>%
+  select(-correct_latitude,
+         -correct_longitude,
+         -correct_sitename,
+         -correct_date,
+         -correct_habitat_typenumber) %>%
   add_ontology(ontology_path = ontology.path)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
@@ -1040,7 +1181,7 @@ des <- "Arhus Uni has a project \"Ponderful\" where they sample from 30 small po
 ext <- ""
 peo <- "Ian Marshall <ianpgm@bio.au.dk>; Kasper Urup Kjeldsen <kasperuk@bio.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publications: Likely not, if so AU lead."
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1067,7 +1208,7 @@ des <- "Sediment samples streams. Different classification of stream condition t
 ext <- ""
 peo <- "Erik Aude <eau@habitatvision.dk>; Lene Thomsen <lt@habitatvision.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publications: Likely not. Perhaps with P05_2, P10_2 and other on \"freshwater\"."
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1094,17 +1235,24 @@ des <- "Sediment samples streams. From DVFI stations, and collected in spring to
 ext <- ""
 peo <- "Jeppe Lund Nielsen <jln@bio.aau.dk>; Nadieh de Jonge <ndj@bio.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publications: Potentially joint publication. Jeppe/Nadieh lead"
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P10_2_filled_table.xlsx")) %>%
+  mutate(correct_sitename=sitename) %>%
+  select(fieldsample_barcode, correct_sitename)
 
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
          habitat_typenumber = ifelse(project_id == pid, "3200", habitat_typenumber),
          sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
+  left_join(filled.table) %>%
+  mutate(sitename           = if_else(project_id == pid, correct_sitename, sitename)) %>%
+  select(-correct_sitename) %>%
   add_ontology(ontology_path = ontology.path)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
@@ -1176,11 +1324,20 @@ des <- "Other stream samples collected by MFD/students (without additional class
 ext <- ""
 peo <- "Philip Francis Thomsen <pfthomsen@bio.au.dk>; Martin Johannesen Klepke <martinjk@bio.au.dk>; Marie Vestergård <mv@bio.au.dk"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publications: Yes, joint publication. MOU is signed. AU lead."
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mapping.project <- readxl::read_xlsx(paste0(metadata.path, "/", pid, "/2023-04-25_P11_2-mapping.xlsx")) %>%
+  filter(!is.na(MFD)) %>%
+  mutate(sample_name = `collab Sample number`,
+         sample_id = MFD) %>%
+  select(sample_name, sample_id) %>%
+  as.data.frame()
+
+
 
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
@@ -1237,7 +1394,7 @@ des <- "Kasper: 30 samples, where extensive geochemical metadata is awailable, a
 ext <- ""
 peo <- "Kasper Urup Kjeldsen <kasperuk@bio.au.dk>; Ian Marshall <ianpgm@bio.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Caitlin Margaret Singleton <cms@bio.aau.dk>"
-com <- "The ANME part is in a separate project with deep sequencing (Caitlin). Samples received as DNA from phenol-chloroform extraction – worked really bad. Publications: joint pub on ANME (AU lead)"
+com <- "The ANME part is in a separate project with deep sequencing (Caitlin). Samples received as DNA from phenol-chloroform extraction – worked really bad."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1269,7 +1426,7 @@ des <- "Deep sediments from IODP cruise in 2013, where focus has been on hunting
 ext <- ""
 peo <- "Kasper Urup Kjeldsen <kasperuk@bio.au.dk>; Ian Marshall <ianpgm@bio.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publications: Likely none"
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1327,7 +1484,7 @@ des <- "Samples from the deep trenches (> 5000 m depths). Compare microbial comm
 ext <- ""
 peo <- "Ronnie Glud <rnglud@biology.sdu.dk>, Clemens Schauberger <schauberger@biology.sdu.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Ronnie Glud <rnglud@biology.sdu.dk>"
-com <- "Close project – don’t include in MFD."
+com <- "Not included in MFD."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1342,6 +1499,28 @@ mfd_db <- mfd_db %>%
          longitude          = ifelse(project_id == pid, NA, longitude),          
          sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
   add_ontology(ontology_path = ontology.path)
+
+filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P12_4_filled_table.xlsx")) %>%
+  mutate(correct_date = sampling_date,
+         correct_latitude = latitude,
+         correct_longitude = longitude,
+         correct_sitename = sitename) %>%
+  select(fieldsample_barcode,
+         correct_date,
+         correct_latitude,
+         correct_longitude,
+         correct_sitename)
+
+mfd_db <- left_join(mfd_db, filled.table,
+                 by="fieldsample_barcode") %>%
+  mutate(sampling_date      = ifelse(project_id == pid, correct_date, sampling_date),
+         latitude           = if_else(project_id == pid, correct_latitude, latitude),
+         longitude          = if_else(project_id == pid, correct_longitude, longitude),
+         sitename           = if_else(project_id == pid, correct_sitename, sitename)) %>%
+  select(-correct_date,
+         -correct_latitude,
+         -correct_longitude,
+         -correct_sitename)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
@@ -1442,7 +1621,7 @@ des <- "Samples collected from water treatment plants. Filtered onto filters."
 ext <- ""
 peo <- "Horsens Torben Lund Skovhus <tols@via.dk>; Ditte Andreasen Søborg <DANS@via.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publication: likely not. If so VIA lead. Very varying results for prep and sequencing. Sampling dates exist but have to be fetched."
+com <- "Very varying results for prep and sequencing. Sampling dates exist but have to be fetched."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1454,6 +1633,15 @@ mfd_db <- mfd_db %>%
          habitat_typenumber = ifelse(project_id == pid, "1100", habitat_typenumber),
          sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
   add_ontology(ontology_path = ontology.path)
+
+filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P16_2_filled_table.xlsx")) %>%
+  mutate(correct_date = format(sampling_date, "%Y-%m-%d")) %>%
+  select(fieldsample_barcode, correct_date)
+
+mfd_db <- left_join(mfd_db, filled.table,
+                 by="fieldsample_barcode") %>%
+  mutate(sampling_date      = ifelse(project_id == pid, correct_date, sampling_date)) %>%
+  select(-correct_date)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
@@ -1470,7 +1658,7 @@ des <- "Sjælland: Samples collected from water treatment plants (water works). 
 ext <- ""
 peo <- "Barth F. Smets <bfsm@dtu.dk>; Marlene Mark Jensen <mmaj@env.dtu.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publication: likely not. If so, DTU lead."
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1500,7 +1688,7 @@ des <- "Soil collected from Danish cities across Denmark, up to 3 soil samples f
 ext <- ""
 peo <- ""
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "People Erika Dvarionaite and Amalie Berg-Mortensen (their emails need to be retrieved). Publication:  likely not as \"stand alone\" – perhaps part of larger soil paper?"
+com <- "People Erika Dvarionaite and Amalie Berg-Mortensen (their emails need to be retrieved)."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1559,7 +1747,7 @@ des <- "Samples from excavations (1000 year old)"
 ext <- ""
 peo <- "Torsten Nygård Kristensen <tnk@bio.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- "Publication: Likely not. No metadata added yet."
+com <- ""
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1571,6 +1759,15 @@ mfd_db <- mfd_db %>%
          habitat_typenumber = ifelse(project_id == pid, "6200", habitat_typenumber),
          sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
   add_ontology(ontology_path = ontology.path)
+
+filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P19_1_filled_table.xlsx")) %>%
+  mutate(correct_date = format(sampling_date, "%Y-%m-%d")) %>%
+  select(fieldsample_barcode, correct_date)
+
+mfd_db <- left_join(mfd_db, filled.table,
+                 by="fieldsample_barcode") %>%
+  mutate(sampling_date      = ifelse(project_id == pid, correct_date, sampling_date)) %>%
+  select(-correct_date)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
