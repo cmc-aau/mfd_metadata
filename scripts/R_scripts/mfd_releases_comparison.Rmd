@@ -158,17 +158,29 @@ openxlsx::saveWorkbook(wb, paste0(releases.path, "/", unlist(str_split(names.sum
 ## Plot time-courses
 ```{r, echo=eval_debug, warning=F, message=F}
 entires.time <- tables.summ %>%
-  filter(field%in%c("sampling_date", "latitude", "longitude", "sitename", "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3")) %>%
+  column_to_rownames(var="field") %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column(var="relsease") %>%
+  rowwise() %>%
+  mutate(coords=min(latitude, longitude)) %>%
+  t() %>%
+  as.data.frame() %>%
+  `colnames<-`(unlist(.[1,])) %>%
+  rownames_to_column(var="field") %>%
+  filter(field%in%c("sampling_date", "coords", "sitename", "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3")) %>%
+  mutate(field = factor(field, levels=c("sampling_date", "coords", "sitename", "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3"))) %>%
   pivot_longer(-field) %>%
+  mutate(value=as.numeric(value)) %>%
   filter(!str_detect(name, "Δ")) %>%
   separate(name, into = c("name", "unit"), sep = " ") %>%
   filter(unit=="[N]") %>%
   ggplot(aes(x=name, y=value, group=field, color=field)) +
   geom_line() +
   theme_classic() +
-  theme(axis.text.x = element_text(angle = 60, hjust = 0.5, vjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
   labs(x="Release date", y="Filled entries")
 
 entires.time
-ggsave(paste0(releases.path, "/entires_time.png"), entires.time, width = 8, height = 3.75)
+ggsave(paste0(releases.path, "/entires_time.png"), entires.time, width=5, height=3.75)
 ```
