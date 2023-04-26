@@ -959,11 +959,30 @@ metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
 
+filled.table <- read.xlsx(paste0(metadata.path, "/", pid, "/P08_2_filled_table.xlsx")) %>%
+  mutate(correct_sitename = sitename) %>%
+  select(fieldsample_barcode, correct_sitename)
+  
+coord.correction <- read.xlsx(paste0(metadata.path, "/", pid, "/Correct coordinates.xlsx")) %>%
+  mutate(correct_latitude = as.numeric(latitude),
+         correct_longitude = as.numeric(longitude)) %>%
+  select(fieldsample_barcode,
+         correct_latitude,
+         correct_longitude)
+
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
          sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
-  add_ontology(ontology_path = ontology.path)
+  add_ontology(ontology_path = ontology.path) %>%
+  left_join(filled.table) %>%
+  mutate(sitename           = if_else(project_id == pid, correct_sitename, sitename)) %>%
+  select(-correct_sitename) %>%
+  left_join(coord.correction) %>%
+  mutate(latitude           = if_else(project_id == pid & !is.na(correct_latitude), correct_latitude, latitude),
+         longitude          = if_else(project_id == pid & !is.na(correct_longitude), correct_longitude, longitude)) %>%
+  select(-correct_latitude,
+         -correct_longitude)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
