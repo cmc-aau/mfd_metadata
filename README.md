@@ -3,7 +3,7 @@
 ## Intro
 Many sources of samples contributed to the Microflora Danica collection. This work orgnises the received metadata from the various subprojects in a standardised way and prepares the (semi-)automated request for the missing information.
 
-**Latest release of the MfD metadata: analysis/releases/2023-04-26_mfd_db.xlsx**
+**Latest release of the MfD metadata: analysis/releases/2023-04-27_mfd_db.xlsx**
 
 The final structure uses a "mfd_project" table listing the subprojects with summary info (e.g. description, people involved, etc.) and links to the location of the per-subproject "mfd_subproject" tables. Those tables list all data tables linked to the subproject. There are three types of tables associated to each subproject:
 - main: info about the minimal metadata variables (in the mfd_report script this is governed by the variable "minimal_indices");
