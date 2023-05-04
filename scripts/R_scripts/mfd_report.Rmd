@@ -15,7 +15,7 @@ params:
   debug: no
   debug2: no
   internal: yes
-  release: no
+  release: yes
 ---
 
 <style type="text/css">
@@ -220,11 +220,16 @@ mapping.project <- readxl::read_xlsx(paste0(metadata.path, "/", pid, "/MFDP005_m
   select(sample_name, sample_id) %>%
   as.data.frame(paste0(metadata.path, "/", pid, "/P01_1_filled_table_TGF.xlsx"))
 
-filled.table <- read.xlsx(paste0(metadata.path, "/", pid, "/P01_1_filled_table_TGF.xlsx"), sheet = 1, detectDates = T) %>%
+filled.table1 <- read.xlsx(paste0(metadata.path, "/", pid, "/P01_1_filled_table_TGF.xlsx"), sheet = 1, detectDates = T) %>%
                             mutate(correct_date = sampling_date) %>%
   select(fieldsample_barcode, correct_date)
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+filled.table2 <- read.xlsx(paste0(metadata.path, "/", pid, "/P01_1_filled_table.xlsx")) %>%
+  mutate(correct_habitat_typenumber = as.character(habitat_typenumber)) %>%
+  select(fieldsample_barcode,
+         correct_habitat_typenumber)
 
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid & habitat_type == "natural_soil", "Natural", mfd_areatype),
@@ -233,10 +238,13 @@ mfd_db <- mfd_db %>%
          sampling_date      = ifelse(project_id == pid, NA, sampling_date),
          sampling_comment   = ifelse(project_id == pid & sampling_comment == "", NA, sampling_comment)) %>%
   add_ontology(ontology_path = ontology.path) %>%
-  left_join(filled.table, by = "fieldsample_barcode") %>%
+  left_join(filled.table1, by = "fieldsample_barcode") %>%
   mutate(sampling_date      = if_else(project_id == pid, correct_date, sampling_date)) %>%
-  select(-correct_date)
-  
+  select(-correct_date) %>%
+  left_join(filled.table2,
+            by="fieldsample_barcode") %>%
+  mutate(habitat_typenumber = if_else(project_id == pid, correct_habitat_typenumber, habitat_typenumber)) %>%
+  select(-correct_habitat_typenumber)
 
 paragraph2 <- paste0("Considering your previously provided data, we were wondering whether the sites corresponing to \"plantation forests\" can be assigned to habitat_typenmubers within the 9xxx categories (\"Forests\"), to fit with the rest of the data. If this is the case, could you please fill the most specific habitat_typenumber in the highlighted cells?\n\n",
                      "In the file you sent us (\"FinalVægteTilUniquenessUdregning.xlsx\"), we have a few questions. For the cases of sitenames \"Knagerne\" and \"Urskoven\" should we choose 9110 or 9120? For the cases where we have \"pilekrat, §3mose\" and \"§3 mose, rørsump/højstaude\" can we please get the corresponding most specific habitat_typenumber?\n",
@@ -247,6 +255,7 @@ N <- nrow(mfd_db_subproject)
 
 res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
 cat(res, sep = "\t")
+rm(filled.table1, filled.table2)
 ```
 
 ## P01_2: Biowide - River valleys
