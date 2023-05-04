@@ -15,7 +15,7 @@ params:
   debug: no
   debug2: no
   internal: yes
-  release: yes
+  release: no
 ---
 
 <style type="text/css">
@@ -615,14 +615,27 @@ unrecoverable.samples <- c("MFD04003", # We'll not retrieve more info from those
                            "MFD04105",
                            "MFD04128")
 
+filled.table <- read.xlsx(paste0(metadata.path, "/", pid, "/P04_4_filled_table.xlsx")) %>%
+  filter(!fieldsample_barcode %in% unrecoverable.samples) %>%
+  mutate(correct_habitat_typenumber = habitat_typenumber,
+         correct_sitename = sitename) %>%
+  select(fieldsample_barcode,
+         correct_habitat_typenumber,
+         correct_sitename)
+
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Agriculture", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
          sampling_date      = if_else(project_id == pid, received, sampling_date),
          sampling_date      = ifelse(project_id == pid & str_detect(sampling_comment, "kvadratnet"), NA, sampling_date),
-         habitat_typenumber = ifelse(project_id == pid, NA, habitat_typenumber)) %>%
-  add_ontology(ontology_path = ontology.path) %>%
-  filter(!fieldsample_barcode %in% unrecoverable.samples)
+         ) %>%
+  filter(!fieldsample_barcode %in% unrecoverable.samples) %>%
+  left_join(filled.table) %>%
+  mutate(habitat_typenumber = ifelse(project_id == pid, correct_habitat_typenumber, habitat_typenumber),
+         sitename           = ifelse(project_id == pid, correct_sitename, sitename)) %>%
+  select(-correct_habitat_typenumber,
+         -correct_sitename) %>%
+  add_ontology(ontology_path = ontology.path)
 
 paragraph2 <- paste0("Could you please provide the grid position as the sitename?\n",
                      "For all samples, do you have information on the crop type or can you chose from the attached ontology file?")
@@ -653,20 +666,22 @@ hab_correction <- readxl::read_excel(paste0(metadata.path, "/", pid, "/2022-11-2
   separate(unified, into = c("a", "b", "seges_hab"), sep = "_") %>%
   select(fieldsample_barcode, seges_hab)
 
-mapping.project <- readxl::read_excel(paste0(metadata.path, "/", pid, "/2022-11-28_mfd-metadata-seges.xlsx"),
-                                     sheet = "MFD to SEGES") %>%
-  filter(!is.na(bægre)) %>%
-  mutate(sample_name=bægre, sample_id=mfd) %>%
-  select(sample_name, sample_id) %>%
-  as.data.frame()
-
 to_remove <- c("MFD07683",
                "MFD07246",
                "MFD09066",
                "MFD08545")
 
+mapping.project <- readxl::read_excel(paste0(metadata.path, "/", pid, "/2022-11-28_mfd-metadata-seges.xlsx"),
+                                     sheet = "MFD to SEGES") %>%
+  filter(!is.na(bægre)) %>%
+  mutate(sample_name=bægre, sample_id=mfd) %>%
+  select(sample_name, sample_id) %>%
+  as.data.frame() %>%
+  filter(!sample_id %in% to_remove)
+
 mfd_db <- mfd_db %>%
-  left_join(hab_correction, by = "fieldsample_barcode") %>%
+  left_join(hab_correction,
+            by = "fieldsample_barcode") %>%
   mutate(mfd_areatype       = ifelse(project_id == pid & habitat_type == "agriculture", "Agriculture", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
          habitat_typenumber = ifelse(project_id == pid, seges_hab, habitat_typenumber),
@@ -874,12 +889,25 @@ metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
 
+filled.table <- read.xlsx(paste0(metadata.path, "/", pid, "/P06_3_filled_table.xlsx"), sheet=1) %>%
+  mutate(correct_habitat_typenumber = habitat_typenumber,
+         correct_date = sampling_date) %>%
+  select(fieldsample_barcode,
+         correct_habitat_typenumber,
+         correct_date)
+
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Subterranean", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
-         habitat_typenumber = ifelse(project_id == pid & str_detect(sampling_comment, "potential"), "6100", habitat_typenumber),
+         #habitat_typenumber = ifelse(project_id == pid & str_detect(sampling_comment, "potential"), "6100", habitat_typenumber),
          sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
-  add_ontology(ontology_path = ontology.path)
+  left_join(filled.table,
+            by = "fieldsample_barcode") %>%
+  mutate(habitat_typenumber  = ifelse(project_id == pid, correct_habitat_typenumber, habitat_typenumber),
+         sampling_date      = ifelse(project_id == pid, correct_date, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path) %>%
+  select(-correct_habitat_typenumber,
+         -correct_date)
 
 paragraph2 <- "Please double-check the dates beacuse they have a broad span."
 
@@ -938,12 +966,12 @@ mfd_db <- mfd_db %>%
   mutate(project_id         = if_else(fieldsample_barcode %in% filled.table$fieldsample_barcode, pid, project_id),
          mfd_areatype       = ifelse(project_id == pid | fieldsample_barcode %in% rescued_samples, "Natural", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid | fieldsample_barcode %in% rescued_samples, "Soil", mfd_sampletype),
-         #sampling_date      = if_else(project_id == pid | fieldsample_barcode %in% rescued_samples, received, sampling_date),
-         latitude           = if_else(project_id == pid, correct_latitude, latitude),
-         longitude          = if_else(project_id == pid, correct_longitude, longitude),
-         sitename           = if_else(project_id == pid, correct_sitename, sitename),
-         sampling_date      = if_else(project_id == pid, correct_date, sampling_date),
-         habitat_typenumber = if_else(project_id == pid, correct_habitat_typenumber, habitat_typenumber)) %>%
+         sampling_date      = if_else(project_id == pid | fieldsample_barcode %in% rescued_samples, received, sampling_date),
+         latitude           = if_else(project_id == pid & !is.na(correct_latitude), correct_latitude, latitude),
+         longitude          = if_else(project_id == pid & !is.na(correct_longitude), correct_longitude, longitude),
+         sitename           = if_else(project_id == pid & !is.na(correct_sitename), correct_sitename, sitename),
+         sampling_date      = if_else(project_id == pid & !is.na(correct_date), correct_date, sampling_date),
+         habitat_typenumber = if_else(project_id == pid & !is.na(correct_habitat_typenumber), correct_habitat_typenumber, habitat_typenumber)) %>%
   select(-correct_latitude,
          -correct_longitude,
          -correct_sitename,
@@ -1020,11 +1048,19 @@ metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
 
+filled.table <- read.xlsx(paste0(metadata.path, "/", pid, "/P08_3_filled_table.xlsx")) %>%
+  mutate(correct_habitat_typenumber = habitat_typenumber) %>%
+  select(fieldsample_barcode,
+         correct_habitat_typenumber)
+
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
          sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
-  add_ontology(ontology_path = ontology.path)
+  left_join(filled.table) %>%
+  mutate(habitat_typenumber      = if_else(project_id == pid, correct_habitat_typenumber, habitat_typenumber)) %>% 
+  add_ontology(ontology_path = ontology.path)  %>%
+  select(-correct_habitat_typenumber)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
@@ -1400,20 +1436,37 @@ des <- "Other stream samples collected by MFD/students (without additional class
 ext <- ""
 peo <- "Philip Francis Thomsen <pfthomsen@bio.au.dk>; Martin Johannesen Klepke <martinjk@bio.au.dk>; Marie Vestergård <mv@bio.au.dk"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Samples MFD10339 and MFD10290 had labels that were impossible to distinguish, therefore they have been removed from the analysis."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+to_remove <- c("MFD10339", "MFD10290")
 
 mapping.project <- readxl::read_xlsx(paste0(metadata.path, "/", pid, "/2023-04-25_P11_2-mapping.xlsx")) %>%
   filter(!is.na(MFD)) %>%
   mutate(sample_name = `collab Sample number`,
          sample_id = MFD) %>%
   select(sample_name, sample_id) %>%
-  as.data.frame()
+  as.data.frame() %>%
+  filter(!sample_id %in% to_remove)
 
-
+filled.table <- read.xlsx(paste0(metadata.path, "/", pid, "/P11_2_filled_table.xlsx"),
+                          sheet = 1,
+                          detectDates = T) %>%
+  mutate(correct_date = as.character(sampling_date),
+         correct_latitude = as.numeric(latitude),
+         correct_longitude = as.numeric(longitude),
+         correct_habitat_typenumber = habitat_typenumber,
+         correct_sitename = sitename) %>%
+  select(fieldsample_barcode,
+         correct_date,
+         correct_latitude,
+         correct_longitude,
+         correct_habitat_typenumber,
+         correct_sitename) %>%
+  filter(!fieldsample_barcode %in% to_remove)
 
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
@@ -1425,6 +1478,19 @@ mfd_db <- mfd_db %>%
          habitat_typenumber = ifelse(project_id == pid & habitat_type == "fjords" & str_detect(sampling_comment, "rocky"),"1302", habitat_typenumber),
          habitat_typenumber = ifelse(project_id == pid & habitat_type == "fjords" & str_detect(sampling_comment, "eelgrass"),"1303", habitat_typenumber),
          sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
+  left_join(filled.table,
+            by = "fieldsample_barcode") %>%
+  mutate(sampling_date      = if_else(project_id == pid, correct_date, sampling_date),
+         latitude           = if_else(project_id == pid, correct_latitude, latitude),
+         longitude          = if_else(project_id == pid, correct_longitude, longitude),
+         habitat_typenumber = if_else(project_id == pid, correct_habitat_typenumber, habitat_typenumber),
+         sitename           = if_else(project_id == pid, correct_sitename, sitename)) %>%
+  select(-correct_date,
+         -correct_latitude,
+         -correct_longitude,
+         -correct_habitat_typenumber,
+         -correct_sitename) %>%
+  filter(!fieldsample_barcode %in% to_remove) %>%
   add_ontology(ontology_path = ontology.path)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
@@ -1854,6 +1920,15 @@ cat(res, sep = "\t")
 
 
 # General outputs
+
+## Output checks
+
+This is the distribution of sample names in the curated metadata:
+
+### Sample duplication check
+```{r, warning=T, echo=eval_debug, eval=T}
+table(table(mfd_db$fieldsample_barcode))
+```
 
 ## Write output
 
