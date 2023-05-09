@@ -15,7 +15,7 @@ params:
   debug: no
   debug2: no
   internal: yes
-  release: no
+  release: yes
 ---
 
 <style type="text/css">
