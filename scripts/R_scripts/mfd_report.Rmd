@@ -15,7 +15,7 @@ params:
   debug: no
   debug2: no
   internal: yes
-  release: yes
+  release: no
 ---
 
 <style type="text/css">
@@ -281,13 +281,23 @@ mapping.project <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P01_2_MF
   select(sample_name, sample_id) %>%
   as.data.frame()
 
+filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P01_2_filled_table.xlsx")) %>%
+  mutate(correct_habitat_typenumber = habitat_typenumber) %>%
+  select(fieldsample_barcode,
+         correct_habitat_typenumber)
+
 mfd_db <- mfd_db %>%
-  left_join(date_correction, by = "fieldsample_barcode") %>%
+  left_join(date_correction,
+            by = "fieldsample_barcode") %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
          sampling_date      = ifelse(project_id == pid, correct_date, sampling_date),
          sampling_date      = ifelse(fieldsample_barcode == "MFD00449", "2018-08-01", sampling_date)) %>% #Assuming its taken at same time..
   select(-correct_date) %>%
+  left_join(filled.table,
+            by = "fieldsample_barcode") %>%
+  mutate(habitat_typenumber = ifelse(project_id == pid, correct_habitat_typenumber, habitat_typenumber)) %>%
+  select(- correct_habitat_typenumber) %>%
   add_ontology(ontology_path = ontology.path)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
@@ -671,9 +681,11 @@ metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
 
-hab_correction <- readxl::read_excel(paste0(metadata.path, "/", pid, "/2022-11-28_mfd-metadata-seges.xlsx")) %>%
+hab_correction <- rbind(readxl::read_excel(paste0(metadata.path, "/", pid, "/2022-11-28_mfd-metadata-seges.xlsx")) %>%
   separate(unified, into = c("a", "b", "seges_hab"), sep = "_") %>%
-  select(fieldsample_barcode, seges_hab)
+  select(fieldsample_barcode, seges_hab),
+  data.frame(fieldsample_barcode=c("MFD08223", "MFD07450"),
+             seges_hab=c("6822", "6822")))
 
 to_remove <- c("MFD07683",
                "MFD07246",
