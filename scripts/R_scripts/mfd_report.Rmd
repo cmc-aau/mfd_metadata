@@ -942,10 +942,13 @@ mapping.project <- filled.table %>%
   select(sample_name, sample_id) %>%
   as.data.frame()
 
+UTM32n <- CRS("+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
+WGS84 <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84") 
+
 utmcoor <- SpatialPoints(cbind(as.numeric(gsub("'|D", "", filled.table$Utm_x)),
                                as.numeric(gsub("'|D", "", filled.table$Ytm_y))),
-                         proj4string=CRS("+proj=utm +zone=32"))
-longlatcoor <- spTransform(utmcoor,CRS("+proj=longlat"))
+                         proj4string=UTM32n)
+longlatcoor <- spTransform(utmcoor, WGS84)
 
 filled.table <- filled.table %>%
   mutate(fieldsample_barcode = MFD_nr,
@@ -967,8 +970,8 @@ mfd_db <- mfd_db %>%
          mfd_areatype       = ifelse(project_id == pid | fieldsample_barcode %in% rescued_samples, "Natural", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid | fieldsample_barcode %in% rescued_samples, "Soil", mfd_sampletype),
          sampling_date      = if_else(project_id == pid | fieldsample_barcode %in% rescued_samples, received, sampling_date),
-         latitude           = if_else(project_id == pid & !is.na(correct_latitude), correct_latitude, latitude),
-         longitude          = if_else(project_id == pid & !is.na(correct_longitude), correct_longitude, longitude),
+         latitude           = if_else(project_id == pid & is.na(latitude), correct_latitude, latitude),
+         longitude          = if_else(project_id == pid & is.na(longitude), correct_longitude, longitude),
          sitename           = if_else(project_id == pid & !is.na(correct_sitename), correct_sitename, sitename),
          sampling_date      = if_else(project_id == pid & !is.na(correct_date), correct_date, sampling_date),
          habitat_typenumber = if_else(project_id == pid & !is.na(correct_habitat_typenumber), correct_habitat_typenumber, habitat_typenumber)) %>%
@@ -1744,7 +1747,7 @@ mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, r
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Water", mfd_sampletype),
-         habitat_typenumber = ifelse(project_id == pid, "3110", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_typenumber == "3000", "3300", habitat_typenumber),
          sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>% # Dates are correct
   add_ontology(ontology_path = ontology.path)
 
@@ -1772,7 +1775,7 @@ mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, r
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Water", mfd_sampletype),
-         habitat_typenumber = ifelse(project_id == pid, "1100", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_typenumber == "3000", "3300", habitat_typenumber),
          sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
   add_ontology(ontology_path = ontology.path)
 
@@ -1809,9 +1812,10 @@ mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, r
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Water", mfd_sampletype),
-         habitat_typenumber = ifelse(project_id == pid & sample_type == "sandfilter", "1100", habitat_typenumber),
-         habitat_typenumber = ifelse(project_id == pid & sample_type == "water(dilute)", "3120", habitat_typenumber),
-         habitat_typenumber = ifelse(project_id == pid & str_detect(sampling_comment, "network"), "3120", habitat_typenumber),         
+         #habitat_typenumber = ifelse(project_id == pid & sample_type == "sandfilter", "1100", habitat_typenumber),
+         #habitat_typenumber = ifelse(project_id == pid & sample_type == "water(dilute)", "3120", habitat_typenumber),
+         #habitat_typenumber = ifelse(project_id == pid & str_detect(sampling_comment, "network"), "3120", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_typenumber == "3000", "3300", habitat_typenumber),
          sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
   add_ontology(ontology_path = ontology.path)
 
