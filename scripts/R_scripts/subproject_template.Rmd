@@ -64,6 +64,11 @@ if(class(missing_meta)=="data.frame"){
 }
 ```
 
+#### Make folder
+```{r echo=eval_debug, message=F, warning=F, error=F}
+dir.create(file.path(paste0(reformat.metadata.path, "/"), pid), showWarnings = FALSE)
+```
+
 #### Write mapping
 ```{r echo=eval_debug, message=F, warning=F, error=F}
 if(exists("mapping.project")){
@@ -93,7 +98,6 @@ if(exists("mapping.project")&class(missing_meta)=="data.frame"){
 
 #### Write minimal metadata
 ```{r echo=eval_debug, message=F, warning=F, error=F}
-dir.create(file.path(paste0(reformat.metadata.path, "/"), pid), showWarnings = FALSE)
 writexl::write_xlsx(mfd_db_subproject, paste0(reformat.metadata.path, "/", pid, "/", pid, "_minimal_metadata.xlsx"))
 ```
 

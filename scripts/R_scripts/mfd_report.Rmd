@@ -1,6 +1,6 @@
 ---
 title: "MFD project and subprojects report"
-author: "M. Albertsen & F. Delogu"
+author: "F. Delogu"
 date: "as.Date(now())"
 output:
   html_document:
@@ -53,6 +53,7 @@ library(rgdal)
 library(sp)
 library(mapproj)
 library(openxlsx)
+library(terra)
 
 options(width = 500)
 ```
@@ -147,6 +148,32 @@ colnames(mfd_db0) <- c("fieldsample_barcode", "sample_type", "gps_location", "ha
                       "sampling_comment", "project_id")
 
 rm(con, qry, executedQuery, token)
+```
+
+### Time lag check
+```{r time lag check, echo=eval_debug}
+tmp_diff <- mfd_db0 %>%
+  mutate(received = dmy_hm(received),
+         scanned = dmy_hm(scanned),
+         time_diff = difftime(received, scanned, units = "mins")) %>%
+  filter(hour(scanned)!=0,
+         hour(received)!=0) %>%
+  filter(time_diff>0) %>% 
+  arrange(time_diff) %>%
+  select(fieldsample_barcode,
+         scanned,
+         received,
+         time_diff,
+         project_id)
+
+table(tmp_diff$project_id)
+
+a <- tmp_diff %>%
+  #filter(time_diff<5000) %>% 
+  pull(time_diff)
+
+hist(as.numeric(a[!is.na(a)]), main="Received-scanned > 0 (mins)")
+rm(tmp, a)
 ```
 
 ### Clean up general problems in the database metadata
@@ -942,18 +969,27 @@ mapping.project <- filled.table %>%
   select(sample_name, sample_id) %>%
   as.data.frame()
 
-UTM32n <- CRS("+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
-WGS84 <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84") 
+UTM32 <- CRS("+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m")
 
-utmcoor <- SpatialPoints(cbind(as.numeric(gsub("'|D", "", filled.table$Utm_x)),
-                               as.numeric(gsub("'|D", "", filled.table$Ytm_y))),
-                         proj4string=UTM32n)
-longlatcoor <- spTransform(utmcoor, WGS84)
+#UTM32n <- CRS("+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
+#WGS84 <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84") 
+
+#utmcoor <- SpatialPoints(cbind(as.numeric(gsub("'|D", "", filled.table$Utm_x)),
+#                               as.numeric(gsub("'|D", "", filled.table$Ytm_y))),
+#                         proj4string=UTM32n)
+lonlat <- geom(project(vect(cbind(as.numeric(gsub("'|D", "", filled.table$Utm_x)),
+                      as.numeric(gsub("'|D", "", filled.table$Ytm_y))),
+                      crs="+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m"),
+                   "+proj=longlat +datum=WGS84"))[, c("x", "y")]
+
+#longlatcoor <- spTransform(utmcoor, WGS84)
 
 filled.table <- filled.table %>%
   mutate(fieldsample_barcode = MFD_nr,
-         correct_latitude = round(longlatcoor$coords.x2, 4),
-         correct_longitude = round(longlatcoor$coords.x1, 4),
+         #correct_latitude = round(longlatcoor$coords.x2, 4),
+         #correct_longitude = round(longlatcoor$coords.x1, 4),
+         correct_longitude = round(lonlat[,1], 5),
+         correct_latitude = round(lonlat[,2], 5),
          correct_sitename = Loknavn,
          correct_date = format(ymd(`Date (year/month/day)`), "%Y-%m-%d"),
          correct_habitat_typenumber = as.character(Naturnr)) %>%
@@ -963,6 +999,38 @@ filled.table <- filled.table %>%
          correct_sitename,
          correct_date,
          correct_habitat_typenumber)
+
+haversine_distance <- function(lon1, lat1, lon2, lat2) {
+  # Convert degrees to radians
+  lon1_rad <- lon1 * pi / 180
+  lat1_rad <- lat1 * pi / 180
+  lon2_rad <- lon2 * pi / 180
+  lat2_rad <- lat2 * pi / 180
+
+  # Radius of the Earth in meters
+  radius <- 6371000  # Approximate value
+
+  # Haversine formula
+  delta_lon <- lon2_rad - lon1_rad
+  delta_lat <- lat2_rad - lat1_rad
+  a <- sin(delta_lat/2)^2 + cos(lat1_rad) * cos(lat2_rad) * sin(delta_lon/2)^2
+  c <- 2 * atan2(sqrt(a), sqrt(1 - a))
+  distance <- radius * c
+
+  return(distance)
+}
+
+tmp <- mfd_db %>%
+  full_join(filled.table) %>%
+  filter(project_id==pid) %>%
+  #mutate(d=sqrt(((correct_longitude-longitude)**2)+((correct_latitude-latitude)**2))*111.139) %>%
+  mutate(d=haversine_distance(correct_longitude, correct_latitude, longitude, latitude)) %>%
+  select(-received) %>%
+  left_join(tmp_diff) %>%
+  mutate(time_diff=ifelse(is.na(as.numeric(time_diff)), 0, time_diff)) %>%
+  filter(!is.na(d),
+         time_diff<500,
+         d>100)
 
 mfd_db <- mfd_db %>%
   full_join(filled.table) %>%
@@ -1218,7 +1286,6 @@ mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
 
 res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
-
 cat(res, sep = "\t")
 
 #![`r figure1.text`](`r paste0(metadata.path, "/P08_7/sampling_locations.png")`)
@@ -1922,6 +1989,30 @@ res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globale
 cat(res, sep = "\t")
 ```
 
+## P25_1: Other - LHP
+```{r P25_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P25_1"
+pnm <- "Other - LHP"
+des <- "Miscellaneous samples from LHP. Samples are from 2008 and was thawed and put in the refrigerator 2 months before subdivision. Samples are either from chalk mine, salt vats or bogs."
+ext <- ""
+peo <- "Lars Haastrup Pedersen <lhp@bio.aau.dk>"
+res <- "Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(sampling_date      = ifelse(project_id == pid, NA, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
 
 # General outputs
 
