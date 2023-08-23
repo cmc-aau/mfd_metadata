@@ -119,7 +119,7 @@ missing_metadata <- function(data_table = NA, indices = NA){
     indices <- colnames(data_table)
   }
   
-  dd <- data_table %>%
+  dd <- data_table[, indices] %>%
     filter(if_any(everything(.), is.na))
   if(nrow(dd)>0){
     return(dd) 
@@ -162,7 +162,7 @@ print_incomplete_entries <- function(data_table = NA, missing_indices = NA,
   
   minimal_explanation <- openxlsx::read.xlsx(minimal_indices_explanation, 1)
   
-  data_table <- data_table %>%
+  data_table <- data_table[] %>%
     mutate(across(everything(), ~trimws(.x)),
            habitat_typenumber=if_else(habitat_typenumber=="", NA, habitat_typenumber),
            sitename=if_else(sitename=="", NA, sitename))
