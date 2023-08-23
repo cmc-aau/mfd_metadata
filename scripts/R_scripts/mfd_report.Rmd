@@ -746,7 +746,9 @@ mfd_db <- mfd_db %>%
          sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
   add_ontology(ontology_path = ontology.path) %>%
   select(-seges_hab) %>%
-  filter(!fieldsample_barcode %in% to_remove)
+  filter(!fieldsample_barcode %in% to_remove) %>%
+  mutate(latitude           = ifelse(project_id == pid, NA, latitude),
+         longitude          = ifelse(project_id == pid, NA, longitude))
 
 paragraph2 <- "As you can see from the table, we are missing all the info from sample MFD07450. Could you please send us the list of your sample IDs so that we can link our data and find the missing sample."
 
@@ -959,6 +961,33 @@ mfd_db <- mfd_db %>%
          latitude = ifelse(project_id == pid & str_detect(sampling_comment, "himmark"),55.043,  latitude),
          longitude = ifelse(project_id == pid & str_detect(sampling_comment, "himmark"),9.852,  longitude),
          sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
+N <- nrow(mfd_db_subproject)
+
+res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globalenv(), quiet = T)
+cat(res, sep = "\t")
+```
+
+## P06_2: Subterranean – Polluted soil, city
+```{r P06_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid <- "P06_2"
+pnm <- "Subterranean – Polluted soil, city"
+des <- "Deep soil test samples"
+ext <- ""
+peo <- "Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
+res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Vibike Rudkjøbing Jørgensen <vrj@bio.aau.dk>"
+com <- ""
+
+metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
+
+mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Subterranean", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
+         sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
   add_ontology(ontology_path = ontology.path)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
@@ -1286,7 +1315,7 @@ filled.table <- readr::read_delim(file = paste0(metadata.path, "/", pid, "/23052
          sampling_date = ymd_hms(sampling_date, truncated = 3) %>% format("%Y-%m-%d"),
          correct_sampling_date = sampling_date,
          hab_code = as.character(hab_code),
-         correct_habitat_typenumber = case_when(hab_code == "2" ~ "2000",
+         correct_habitat_typenumber = case_when(hab_code == "2" ~ NA,
                                                 hab_code == "91" ~ "91E0",
                                                 .default = hab_code),
          correct_latitude = latitude,
