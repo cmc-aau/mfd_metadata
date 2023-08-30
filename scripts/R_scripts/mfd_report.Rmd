@@ -2641,7 +2641,7 @@ mfd_db <- mfd_db %>%
          mfd_sampletype     = if_else(project_id == pid, correct_mfd_sampletype, mfd_sampletype),
          mfd_areatype       = if_else(project_id == pid, correct_mfd_areatype, mfd_areatype),
          habitat_typenumber = if_else(project_id == pid, correct_habitat_typenumber, habitat_typenumber)) %>%
-  select(-correct_date, correct_mfd_sampletype, correct_mfd_areatype, correct_habitat_typenumber) %>%
+  select(-correct_date, -correct_mfd_sampletype, -correct_mfd_areatype, -correct_habitat_typenumber) %>%
   add_ontology(ontology_path = ontology.path)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
