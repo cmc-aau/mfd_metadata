@@ -413,7 +413,7 @@ des <- "Thes samples are taken in the Biowide design (40x40 meter (or a narrower
 ext <- ""
 peo <- "Tobias Guldberg Frøslev < tobiasgf@sund.ku.dk>"
 res <- "Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>; Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Sample MFD00398B removed as duplicate"
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
@@ -447,7 +447,8 @@ mfd_db <- mfd_db %>%
   select(-correct_date) %>%
   left_join(filled.table, by = "fieldsample_barcode") %>%
   mutate(sitename = if_else(project_id == pid, correct_sitename, sitename)) %>%
-  select(-correct_sitename)
+  select(-correct_sitename) %>%
+  filter(fieldsample_barcode != "MFD00398B")
 
 paragraph2 <- "Could you please verify the GPS coordinates? It looks like there are pairs of samples with the exact coordinates whilst they were supposedly sampled from the edge and the center of the same field."
 
@@ -466,7 +467,7 @@ des <- "Related the soil tracker project, see \"Treated like dirt: Robust forens
 ext <- ""
 peo <- "Tobias Guldberg Frøslev <tfroeslev@gbif.org>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Sample MFD00457B was removed as duplicate"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -505,7 +506,8 @@ mfd_db <- mfd_db %>%
   mutate(latitude          = if_else(project_id == pid, correct_latitude, latitude),
          longitude         = if_else(project_id == pid, correct_longitude, longitude)) %>%
   select(-correct_latitude,
-         -correct_longitude)
+         -correct_longitude) %>%
+  filter(fieldsample_barcode != "MFD00457B")
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
@@ -653,7 +655,9 @@ mfd_db <- mfd_db %>%
                                     fieldsample_barcode == "MFD04123" ~ "2020-03-11",
                                     .default = sampling_date)) %>%
   select(-sample_id,
-         -Dato)
+         -Dato) %>%
+  mutate(latitude       = ifelse(project_id == pid, NA, latitude),
+         longitude      = ifelse(project_id == pid, NA, longitude))
 
 paragraph2 <- "Were the pairs of samples, sampled the same day, exactly one year apart (as it looks like from the sampling_date column)?"
 
@@ -1355,7 +1359,7 @@ des <- "Collaboration about 750 samples for biodiversity studies in SustainScape
 ext <- ""
 peo <- "Signe Normand <signe.normand@bio.au.dk>; Urs Treier <urs.treier@bio.au.dk>; Bjarke Madsen <bjarke.madsen@bio.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
-com <- "10 samples are reallocared to P08_8: Natual - Sinks"
+com <- "10 samples are reallocared to P08_8: Natual - Sinks. Sample MFD06328 has been removed due to mislabelling."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1386,7 +1390,8 @@ filled.table <- readr::read_delim(file = paste0(metadata.path, "/", pid, "/23052
          correct_longitude,
          correct_sampling_date,
          correct_habitat_typenumber,
-         correct_sitename)
+         correct_sitename) %>%
+  filter(!fieldsample_barcode%in%c("MFD06200", "MFD10197"))
 
 filled.table2 <- readxl::read_excel(paste0(metadata.path, "/P08_8/P08_8_frde_standard table.xlsx"))
 
@@ -1396,7 +1401,7 @@ filled.table1 <- (readr::read_delim(file = paste0(metadata.path, "/", pid, "/230
                                 col_names = T) %>%
   mutate(fieldsample_barcode = CORRECTED_barcode_fieldsample,
          fieldsample_barcode = ifelse(fieldsample_barcode=="MFD6609", "MFD06609", fieldsample_barcode)) %>%
-  filter(!fieldsample_barcode%in%mfd_db$fieldsample_barcode, !fieldsample_barcode%in%filled.table2$fieldsample_barcode) %>%
+  filter(!fieldsample_barcode%in%mfd_db$fieldsample_barcode) %>% # , !fieldsample_barcode%in%filled.table2$fieldsample_barcode) %>%
   mutate(habitat_typenumber = hab_code,
          sampling_comment = hab_name,
          sample_type = type_sample,
@@ -1412,6 +1417,7 @@ filled.table1 <- (readr::read_delim(file = paste0(metadata.path, "/", pid, "/230
   add_ontology(ontology_path = ontology.path)
 
 mfd_db <- mfd_db %>%
+  filter(fieldsample_barcode!="MFD06328") %>%
   left_join(correct_date, by = "fieldsample_barcode") %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
@@ -1420,8 +1426,9 @@ mfd_db <- mfd_db %>%
          longitude          = ifelse(project_id == pid, tlon, longitude)) %>%
   select(-tdate, -tlat, -tlon) %>%
   left_join(filled.table,
-            by = "fieldsample_barcode") %>%
-  mutate(latitude = if_else((project_id==pid & is.na(latitude)), correct_latitude, latitude),
+            by = c("fieldsample_barcode")) %>%
+  mutate(project_id = if_else((fieldsample_barcode %in% filled.table$fieldsample_barcode), "P08_5", project_id),
+         latitude = if_else((project_id==pid & is.na(latitude)), correct_latitude, latitude),
          longitude = if_else((project_id==pid & is.na(longitude)), correct_longitude, longitude),
          sampling_date = if_else((project_id==pid & is.na(sampling_date)), correct_sampling_date, sampling_date),
          sitename = if_else((project_id==pid & is.na(sitename)), correct_sitename, sitename),
@@ -1437,8 +1444,9 @@ mfd_db <- mfd_db %>%
          -correct_sitename,
          -correct_habitat_typenumber) %>%
   rbind(filled.table1) %>%
-  filter(!fieldsample_barcode %in% c("MFD10676", "MFD06329", "MFD10618")) # Duplicated samples as of 2023.06.07
-
+  filter(!fieldsample_barcode %in% c("MFD10676", "MFD06329", "MFD10618")) %>% # Duplicated samples as of 2023.06.07
+  mutate(fieldsample_barcode = if_else(fieldsample_barcode=="MDF06762", "MFD06762", fieldsample_barcode))
+  
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
 
@@ -1570,7 +1578,7 @@ des <- ""
 ext <- ""
 peo <- "Signe Normand <signe.normand@bio.au.dk>; Urs Treier <urs.treier@bio.au.dk>; Bjarke Madsen <bjarke.madsen@bio.au.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>; Thomas Bygh Nymann Jensen <tbnj@bio.aau.dk>"
-com <- "Samples reallocared from P08_5: Natual - Sustain scapes"
+com <- "Samples reallocared from P08_5: Natual - Sustain scapes. Removing the 10 samples form P08_5 that were moved to P08_8."
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1582,7 +1590,9 @@ filled.table <- (readxl::read_excel(paste0(metadata.path, "/P08_8/P08_8_frde_sta
 
 mfd_db <- mfd_db %>%
   rbind(filled.table) %>%
-  add_ontology(ontology_path = ontology.path)
+  add_ontology(ontology_path = ontology.path) %>%
+  filter(!(fieldsample_barcode%in%filled.table$fieldsample_barcode & project_id=="P08_5"))
+
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
@@ -1793,7 +1803,7 @@ des <- "Sediment samples streams. From DVFI stations, and collected in spring to
 ext <- ""
 peo <- "Jeppe Lund Nielsen <jln@bio.aau.dk>; Nadieh de Jonge <ndj@bio.aau.dk>"
 res <- "Per Halkjær Nielsen <phn@bio.aau.dk>"
-com <- ""
+com <- "Sample MFD00228 was removed because it was a duplicate"
 
 metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 
@@ -1811,7 +1821,8 @@ mfd_db <- mfd_db %>%
   left_join(filled.table, by = "fieldsample_barcode") %>%
   mutate(sitename           = if_else(project_id == pid, correct_sitename, sitename)) %>%
   select(-correct_sitename) %>%
-  add_ontology(ontology_path = ontology.path)
+  add_ontology(ontology_path = ontology.path) %>%
+  filter(fieldsample_barcode!="MFD00228")
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
@@ -2146,7 +2157,8 @@ filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P12_5_frde_
   add_ontology(ontology_path = ontology.path)
 
 mfd_db <- mfd_db %>%
-  rbind(filled.table[,colnames(mfd_db)])
+  rbind(filled.table[,colnames(mfd_db)]) %>%
+  mutate(fieldsample_barcode = if_else(fieldsample_barcode=="MDF12931", "MFD12931", fieldsample_barcode))
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
 N <- nrow(mfd_db_subproject)
