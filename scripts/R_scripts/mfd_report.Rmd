@@ -15,7 +15,7 @@ params:
   debug: no
   debug2: no
   internal: yes
-  release: yes
+  release: no
 ---
 
 <style type="text/css">
@@ -38,7 +38,7 @@ pre {
 Installing libraries not included in the mamba environment.
 ```{r install libraries, message=F, warning=F, echo=params$debug}
 if(!require("devtools")) install.packages("devtools")
-devtools::install_github("sebastianbarfort/mapDK")
+#devtools::install_github("sebastianbarfort/mapDK")
 ```
 
 ## Load libraries
@@ -1444,7 +1444,10 @@ mfd_db <- mfd_db %>%
          -correct_sitename,
          -correct_habitat_typenumber) %>%
   rbind(filled.table1) %>%
-  filter(!fieldsample_barcode %in% c("MFD10676", "MFD06329", "MFD10618")) %>% # Duplicated samples as of 2023.06.07
+  mutate(mfd_sampletype = if_else(project_id == pid & is.na(mfd_sampletype), "Soil", mfd_sampletype),
+         mfd_areatype = if_else(project_id == pid & is.na(mfd_areatype), "Natural", mfd_areatype)) %>%
+  add_ontology(ontology_path = ontology.path) %>%
+  filter(!fieldsample_barcode %in% c("MFD10676", "MFD06328", "MFD06329", "MFD10618")) %>% # Duplicated samples as of 2023.06.07
   mutate(fieldsample_barcode = if_else(fieldsample_barcode=="MDF06762", "MFD06762", fieldsample_barcode))
   
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
@@ -1472,7 +1475,7 @@ mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, r
 filled.table1 <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P08_6_minimal_metadata_batch1&2.xlsx")) %>%
   separate(habitat_typenumber, into = c("to_delete1", "to_delete2", "habitat_typenumber")) %>%
     select(-to_delete1, -to_delete2) %>%
-  mutate(correct_date = ymd(sampling_date),
+  mutate(correct_date = as.character(ymd(sampling_date)),
          correct_sitename = sitename,
          correct_habitat_typenumber = habitat_typenumber) %>%
   select(fieldsample_barcode,
