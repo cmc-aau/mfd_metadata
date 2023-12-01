@@ -15,7 +15,7 @@ params:
   debug: no
   debug2: no
   internal: yes
-  release: no
+  release: yes
 ---
 
 <style type="text/css">
@@ -66,7 +66,7 @@ Sys.setenv("LANGUAGE"="En")
 
 wd <- getwd()
 
-ontology.path <- paste0(wd, '/../../data/ontology/2023-08-28_mfd-habitat-ontology.xlsx')
+ontology.path <- paste0(wd, '/../../data/ontology/2023-12-01_mfd-habitat-ontology.xlsx')
 downloads.path <- paste0(wd, '/../../data/downloads')
 metadata.path <- paste0(wd, '/../../data/metadata')
 
@@ -82,9 +82,10 @@ minimal_indices <- c("fieldsample_barcode", "sample_type", "sampling_date",
                      "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3") # NA is interpreted as all
 
 release_indices <- c("project_id",
-                     "fieldsample_barcode", "sample_type", "sampling_date",
-                     "latitude", "longitude",  "habitat_type", "habitat_typenumber", "sitename",
-                     "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3") # NA is interpreted as all
+                     "fieldsample_barcode", "sampling_date",
+                     "latitude", "longitude", "habitat_typenumber", "sitename",
+                     "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3",
+                     "coords_reliable") # NA is interpreted as all
 
 eval_debug <- params$debug
 eval_debug2 <- params$debug2
@@ -1080,7 +1081,6 @@ filled.table <- read.xlsx(paste0(metadata.path, "/", pid, "/P06_3_filled_table.x
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Subterranean", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
-         #habitat_typenumber = ifelse(project_id == pid & str_detect(sampling_comment, "potential"), "6100", habitat_typenumber),
          sampling_date      = ifelse(project_id == pid, received, sampling_date)) %>%
   left_join(filled.table,
             by = "fieldsample_barcode") %>%
@@ -1125,23 +1125,13 @@ mapping.project <- filled.table %>%
 
 UTM32 <- CRS("+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m")
 
-#UTM32n <- CRS("+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
-#WGS84 <- CRS("+proj=longlat +ellps=WGS84 +datum=WGS84") 
-
-#utmcoor <- SpatialPoints(cbind(as.numeric(gsub("'|D", "", filled.table$Utm_x)),
-#                               as.numeric(gsub("'|D", "", filled.table$Ytm_y))),
-#                         proj4string=UTM32n)
 lonlat <- geom(project(vect(cbind(as.numeric(gsub("'|D", "", filled.table$Utm_x)),
                       as.numeric(gsub("'|D", "", filled.table$Ytm_y))),
                       crs="+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m"),
                    "+proj=longlat +datum=WGS84"))[, c("x", "y")]
 
-#longlatcoor <- spTransform(utmcoor, WGS84)
-
 filled.table <- filled.table %>%
   mutate(fieldsample_barcode = MFD_nr,
-         #correct_latitude = round(longlatcoor$coords.x2, 4),
-         #correct_longitude = round(longlatcoor$coords.x1, 4),
          correct_longitude = round(lonlat[,1], 5),
          correct_latitude = round(lonlat[,2], 5),
          correct_sitename = Loknavn,
@@ -1178,7 +1168,6 @@ tmp <- mfd_db %>%
   full_join(filled.table,
             by = "fieldsample_barcode") %>%
   filter(project_id==pid) %>%
-  #mutate(d=sqrt(((correct_longitude-longitude)**2)+((correct_latitude-latitude)**2))*111.139) %>%
   mutate(d=haversine_distance(correct_longitude, correct_latitude, longitude, latitude)) %>%
   select(-received) %>%
   left_join(tmp_diff) %>%
@@ -1588,7 +1577,9 @@ metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
 
 filled.table <- (readxl::read_excel(paste0(metadata.path, "/P08_8/P08_8_frde_standard table.xlsx")) %>%
-                   mutate(received = NA) %>%
+                   mutate(received = NA,
+                          mfd_areatype = "Natural",
+                          mfd_sampletype = "Soil") %>%
   select(-project_name))[,colnames(mfd_db)]
 
 mfd_db <- mfd_db %>%
@@ -1663,7 +1654,8 @@ mfd_db <- mfd_db %>%
          -correct_date,
          -correct_habitat_typenumber) %>%
   mutate(habitat_typenumber = if_else(project_id == pid & mfd_areatype == "Natural" & mfd_sampletype == "Sediment" & habitat_typenumber == "3103", "3150", habitat_typenumber),
-         habitat_typenumber = if_else(project_id == pid & mfd_areatype == "Natural" & mfd_sampletype == "Sediment" & habitat_typenumber == "3104", "3160", habitat_typenumber)) %>%
+         habitat_typenumber = if_else(project_id == pid & mfd_areatype == "Natural" & mfd_sampletype == "Sediment" & habitat_typenumber == "3104", "3160", habitat_typenumber),
+         habitat_typenumber = if_else(project_id == pid & mfd_areatype == "Natural" & mfd_sampletype == "Sediment" & habitat_typenumber == "1150", "3170", habitat_typenumber)) %>%
   add_ontology(ontology_path = ontology.path)
 
 mfd_db_subproject <- mfd_subset(project = pid, data_table = mfd_db)
@@ -2666,6 +2658,40 @@ res <- knitr::knit_child(paste0(wd, "/subproject_template.Rmd"), envir = globale
 cat(res, sep = "\t")
 ```
 
+# Additional parsing
+
+## Remove projects not included
+
+```{r, warning=T, echo=eval_debug, eval=T}
+mfd_db <- mfd_db %>%
+  filter(!project_id %in% c("P04_1", "P12_4"))
+```
+
+## Add centroids for P04_3 and P04_5
+
+```{r, warning=T, echo=eval_debug, eval=T}
+centroids.df <- readxl::read_xlsx(paste0(metadata.path, "/P04_5/centroids_seges.xlsx")) %>%
+  filter(!is.na(MFD_id)) %>%
+  mutate(correct_longitude = longitude,
+         correct_latitude = latitude,
+         fieldsample_barcode = MFD_id) %>%
+  select(fieldsample_barcode, correct_longitude, correct_latitude)
+
+mfd_db <- mfd_db %>%
+  left_join(centroids.df,
+            by = "fieldsample_barcode") %>%
+  mutate(longitude = if_else((is.na(longitude)&!is.na(correct_longitude)), correct_longitude, longitude),
+         latitude = if_else((is.na(latitude)&!is.na(correct_latitude)), correct_latitude, latitude)) %>%
+  select(-correct_longitude, -correct_latitude)
+```
+
+## Add coordinates reliability column
+
+```{r, warning=T, echo=eval_debug, eval=T}
+mfd_db <- mfd_db %>%
+  mutate(coords_reliable = if_else(project_id %in% c("P04_3", "P04_5", "P06_3"), "No", "Yes"))
+```
+
 # General outputs
 
 ## Output checks
@@ -2701,9 +2727,19 @@ writexl::write_xlsx(mfd_db, path = paste0(reformat.metadata.path, "/mfd_db.xlsx"
 ### Write project map
 ```{r, warning=T, echo=eval_debug, eval=eval_release}
 print_internal_map(data_table = mfd_projects, fname = paste0(releases.path, "/", Sys.Date(), "_mfd_projects.xlsx"))
+
+if(file.exists(paste0(releases.path, "/latest_mfd_projects.xlsx"))){
+  file.remove(paste0(releases.path, "/latest_mfd_projects.xlsx"))
+}
+print_internal_map(data_table = mfd_projects, fname = paste0(releases.path, "/latest_mfd_projects.xlsx"))
 ```
 
 ### Write mfd db
 ```{r, warning=T, echo=eval_debug, eval=eval_release}
 writexl::write_xlsx(mfd_db[,release_indices], path = paste0(releases.path, "/", Sys.Date(), "_mfd_db.xlsx"))
+
+if(file.exists(paste0(releases.path, "/latest_mfd_db.xlsx"))){
+  file.remove(paste0(releases.path, "/latest_mfd_db.xlsx"))
+}
+writexl::write_xlsx(mfd_db[,release_indices], path = paste0(releases.path, "/latest_mfd_db.xlsx"))
 ```

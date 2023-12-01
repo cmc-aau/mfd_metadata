@@ -74,6 +74,7 @@ source(paste0(wd, "/mfd_report_test_routine.R"))
 Read al the time-stamped MfD metadata releases
 ```{r, echo=eval_debug}
 file.paths <- list.files(releases.path, pattern="*.xlsx", full.names=TRUE)
+file.paths <- file.paths[!file.paths%in%c(paste0(releases.path, "/latest_mfd_db.xlsx"))]
 tables <- lapply(file.paths, read.xlsx)
 fnames <- basename(file.paths)
 ```

@@ -3,7 +3,11 @@
 ## Intro
 Many sources of samples contributed to the Microflora Danica collection. This work orgnises the received metadata from the various subprojects in a standardised way and prepares the (semi-)automated request for the missing information.
 
-**Latest release of the MfD metadata: analysis/releases/2023-09-25_mfd_db.xlsx**
+**Latest release of the MfD ontology: `data/ontology/latest_mfd-habitat-ontology.xlsx`**
+**Latest release of the MfD field metadata: `analysis/releases/latest_mfd_db.xlsx`**
+**Latest release of the MfD technical metadata: `data/metadata/general/latest_corrected_combined_metadata.csv`**
+
+Please note that the sample coordinates for projects P04_3, P04_5 and P06_3 are not reliable as noted in the column "coords_reliable" from the `<VERSION>_mfd_db.xlsx` file.
 
 The final structure uses a "mfd_project" table listing the subprojects with summary info (e.g. description, people involved, etc.) and links to the location of the per-subproject "mfd_subproject" tables. Those tables list all data tables linked to the subproject. There are three types of tables associated to each subproject:
 - main: info about the minimal metadata variables (in the mfd_report script this is governed by the variable "minimal_indices");
@@ -20,7 +24,7 @@ The final structure uses a "mfd_project" table listing the subprojects with summ
 | Folder | Content |
 | --- | --- |
 | ├── analysis/                                        | Results of the analysis |
-| │   ├── mails_01/                                    | Automatic generated email and material to send to project parnters |
+| │   ├── mails_01/                                    | Automatic generated email and material to send to project partners |
 | │   │   └── P\<NUMBER\>/                             | Project-specific folders |
 | │   ├── metadata/                                    | Reformatted metadata for internal usage |
 | │   │   └── P\<NUMBER\>/                             | Project-specific folders |
