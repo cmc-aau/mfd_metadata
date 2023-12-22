@@ -66,7 +66,7 @@ Sys.setenv("LANGUAGE"="En")
 
 wd <- getwd()
 
-ontology.path <- paste0(wd, '/../../data/ontology/2023-12-01_mfd-habitat-ontology.xlsx')
+ontology.path <- paste0(wd, '/../../data/ontology/2023-12-21_mfd-habitat-ontology.xlsx')
 downloads.path <- paste0(wd, '/../../data/downloads')
 metadata.path <- paste0(wd, '/../../data/metadata')
 
@@ -383,7 +383,7 @@ mfd_db <- mfd_db %>%
          mfd_areatype       = ifelse(project_id == pid & habitat_type == "agriculture", "Agriculture", mfd_areatype),
          mfd_areatype       = ifelse(project_id == pid & str_detect(sampling_comment, "roadverge"), "Urban", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
-         habitat_typenumber = ifelse(project_id == pid &  str_detect(sampling_comment, "roadverge"), "6100", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid &  str_detect(sampling_comment, "roadverge"), "1000", habitat_typenumber),
          sampling_date      = ifelse(project_id == pid, correct_date, sampling_date)) %>%
   select(-correct_date) %>%
   left_join(filled.table) %>%
@@ -496,8 +496,8 @@ mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid & sample_type == "soil", "Soil", mfd_sampletype),
          mfd_sampletype     = ifelse(project_id == pid & sample_type == "sediment", "Sediment", mfd_sampletype),
-         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_parks", "6410", habitat_typenumber),
-         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_other", "6420", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_parks", "4100", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_other", "4200", habitat_typenumber),
          habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_pond", "3110", habitat_typenumber),
          sampling_date      = ifelse(project_id == pid, correct_date, sampling_date),
          sampling_date=ifelse(fieldsample_barcode=="MFD00457B", "2017-11-02", sampling_date)) %>%
@@ -2179,7 +2179,7 @@ mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, r
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Water", mfd_sampletype),
-         habitat_typenumber = ifelse(project_id == pid, "1210", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid, "2100", habitat_typenumber),
          sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
   add_ontology(ontology_path = ontology.path)
 
@@ -2206,8 +2206,8 @@ mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, r
 
 filled.table <- readxl::read_xlsx(paste0(metadata.path, "/", pid, "/P13_2_table_to_fill_Wextrasamples2.xlsx")) %>%
   filter(!fieldsample_barcode%in%mfd_db$fieldsample_barcode) %>%
-  mutate(habitat_typenumber = ifelse(habitat_typenumber == "2210", "1210", habitat_typenumber),
-         habitat_typenumber = ifelse(habitat_typenumber == "2211", "1211", habitat_typenumber),
+  mutate(habitat_typenumber = ifelse(habitat_typenumber == "2210", "2100", habitat_typenumber),
+         habitat_typenumber = ifelse(habitat_typenumber == "2211", "2200", habitat_typenumber),
          longitude = as.numeric(longitude),
          latitude = as.numeric(latitude),
          received = NA,
@@ -2219,7 +2219,7 @@ filled.table <- readxl::read_xlsx(paste0(metadata.path, "/", pid, "/P13_2_table_
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Water", mfd_sampletype),
-         habitat_typenumber = ifelse(project_id == pid, "1211", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid, "2200", habitat_typenumber),
          sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
   rbind(filled.table[!filled.table$fieldsample_barcode%in%mfd_db$fieldsample_barcode,colnames(mfd_db)]) %>%
   #filter(!(project_id==pid & grepl("negative control", sampling_comment))) %>%
@@ -2260,9 +2260,9 @@ filled.table <- (readxl::read_xlsx(paste0(metadata.path, "/", pid, "/P13_3_frde_
 
 mfd_db <- mfd_db %>%
   rbind(filled.table) %>%
-  mutate(habitat_typenumber = ifelse((project_id == pid & habitat_typenumber == "2111"), "1411", habitat_typenumber),
-         habitat_typenumber = ifelse((project_id == pid & habitat_typenumber == "2112"), "1412", habitat_typenumber),
-         habitat_typenumber = ifelse((project_id == pid & habitat_typenumber == "2119"), "1419", habitat_typenumber),
+  mutate(habitat_typenumber = ifelse((project_id == pid & habitat_typenumber == "2111"), "4100", habitat_typenumber),
+         habitat_typenumber = ifelse((project_id == pid & habitat_typenumber == "2112"), "4200", habitat_typenumber),
+         habitat_typenumber = ifelse((project_id == pid & habitat_typenumber == "2119"), "4300", habitat_typenumber),
          sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
   #rbind(filled.table[!filled.table$fieldsample_barcode%in%mfd_db$fieldsample_barcode,colnames(mfd_db)]) %>%
   #filter(!(project_id==pid & grepl("negative control", sampling_comment))) %>%
@@ -2425,8 +2425,8 @@ mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, r
 mfd_db <- mfd_db %>%
   mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid, "Soil", mfd_sampletype),
-         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_parks", "6410", habitat_typenumber),
-         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_other", "6420", habitat_typenumber),         
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_parks", "4100", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid & habitat_type == "city_other", "4200", habitat_typenumber),         
          sampling_date      = if_else(project_id == pid, received, sampling_date),
          sampling_date      = ifelse(fieldsample_barcode=="MFD10966", "2022-05-23", sampling_date),
          sampling_date      = ifelse(fieldsample_barcode=="MFD02265", "2020-07-08", sampling_date)) %>%
@@ -2558,7 +2558,8 @@ filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P20_1_frde_
          mfd_areatype = str_replace(mfd_areatype, "^\\w{1}", toupper),
          sampling_date = sampling_date  %>% format("%Y-%m-%d"),
          habitat_typenumber = case_when(habitat_typenumber == "wa_u_6310" ~ "wa_u_1310",
-                                   habitat_typenumber == "se_u_6310" ~ "se_u_2110",
+                                        habitat_typenumber == "so_u_6310" ~ "so_u_3100",
+                                        habitat_typenumber == "se_u_6310" ~ "se_u_2100",
                                    .default = habitat_typenumber), 
     latitude = as.numeric(latitude),
     longitude = as.numeric(longitude),
@@ -2633,8 +2634,8 @@ filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P25_1_frde_
                                    habitat_type == "built_environment" ~ "Urban",
                                    .default = mfd_areatype),
          habitat_typenumber = as.character(habitat_typenumber),
-         habitat_typenumber = case_when(habitat_typenumber == "9110" ~ "2120",
-                                        habitat_typenumber == "9120" ~ "2130",
+         habitat_typenumber = case_when(habitat_typenumber == "9110" ~ "2200",
+                                        habitat_typenumber == "9120" ~ "2300",
                                         .default = habitat_typenumber),
          correct_habitat_typenumber = as.character(habitat_typenumber),
          correct_date = dmy(sampling_date)) %>%
