@@ -55,7 +55,10 @@ library(mapproj)
 library(openxlsx)
 library(terra)
 
-options(width = 500)
+options(stringsAsFactors = F,
+        width = 500,
+        gsubfn.engine = "R",
+        timeout = max(1000, getOption("timeout")))
 ```
 
 ## Set the environment
@@ -1183,8 +1186,8 @@ mfd_db <- mfd_db %>%
          mfd_areatype       = ifelse(project_id == pid | fieldsample_barcode %in% rescued_samples, "Natural", mfd_areatype),
          mfd_sampletype     = ifelse(project_id == pid | fieldsample_barcode %in% rescued_samples, "Soil", mfd_sampletype),
          sampling_date      = if_else(project_id == pid | fieldsample_barcode %in% rescued_samples, received, sampling_date),
-         latitude           = if_else(project_id == pid & is.na(latitude), correct_latitude, latitude),
-         longitude          = if_else(project_id == pid & is.na(longitude), correct_longitude, longitude),
+         latitude           = if_else(project_id == pid & !is.na(correct_latitude), correct_latitude, latitude), # Priority to UTM-based coords
+         longitude          = if_else(project_id == pid & !is.na(correct_longitude), correct_longitude, longitude), # Priority to UTM-based coords
          sitename           = if_else(project_id == pid & !is.na(correct_sitename), correct_sitename, sitename),
          sampling_date      = if_else(project_id == pid & !is.na(correct_date), correct_date, sampling_date),
          habitat_typenumber = if_else(project_id == pid & !is.na(correct_habitat_typenumber), correct_habitat_typenumber, habitat_typenumber)) %>%
@@ -2691,6 +2694,243 @@ mfd_db <- mfd_db %>%
 ```{r, warning=T, echo=eval_debug, eval=T}
 mfd_db <- mfd_db %>%
   mutate(coords_reliable = if_else(project_id %in% c("P04_3", "P04_5", "P06_3"), "No", "Yes"))
+```
+
+## Comparison with Basemap04
+
+### Download LU map
+
+```{r download LU map, echo=F, message=F, warning=F, error=F, results='asis'}
+if(!file.exists(paste0(downloads.path,"/Basemap04_2021/lu_agg_2021.tif"))){
+  download.file(url = "https://envs.au.dk/fileadmin/envs/Hjemmeside_2018/Zip_filer/Basemap04_public_geotiff.zip",
+                paste0(downloads.path, "/Basemap04_public_geotiff.zip"))
+  unzip(paste0(downloads.path, "/Basemap04_public_geotiff.zip"), exdir = downloads.path)
+}
+
+#if(!file.exists(paste0(downloads.path,"/Basemap04_2021/lu_agg_2021_lonlat.tif"))){
+#  tmp.rast <- rast(paste0(downloads.path,"/Basemap04_2021/lu_agg_2021.tif"))  %>%
+#    project(crs(rast()))
+#  writeRaster(tmp.rast, paste0(downloads.path,"/Basemap04_2021/lu_agg_2021_lonlat.tif"),
+#              overwrite=T)
+#}
+
+LU.rast <- rast(paste0(downloads.path,"/Basemap04_2021/lu_agg_2021.tif")) %>%
+  project(crs(rast()))
+LU.codes <- cats(LU.rast)[[1]] %>%
+  mutate(LU_summ = case_when(VALUE >= 110000 & VALUE <= 160000 ~ "Built_environment",
+                             VALUE >= 211000 & VALUE <= 230000 ~ "Agriculture",
+                             VALUE >= 311000 & VALUE <= 312000 ~ "Forest",
+                             VALUE >= 321000 & VALUE <= 321000 ~ "Nature",
+                             VALUE >= 322000 & VALUE <= 322000 ~ "Nature",
+                             VALUE >= 321220 & VALUE <= 321220 ~ "Agriculture_Nature",
+                             VALUE >= 322220 & VALUE <= 322220 ~ "Agriculture_Nature",
+                             VALUE >= 411000 & VALUE <= 420000 ~ "Water",
+                             VALUE >= 800000 & VALUE <= 800000 ~ "Unmapped",
+                             VALUE >= 999999 & VALUE <= 999999 ~ "Germany"))
+
+```
+
+### Make SpatVector
+```{r Make SpatVector, echo=F, message=F, warning=F, error=F, results='asis'}
+sampling.locations <- vect(data.frame(lon = mfd_db$longitude, lat = mfd_db$latitude), geom = c("lon", "lat"))
+```
+
+### Extract overlay
+```{r Extract overlay, echo=F, message=F, warning=F, error=F, results='asis'}
+mfd_LU_ontology <- mfd_db %>%
+  mutate(C_01 = (extract(LU.rast, sampling.locations) %>% pull(C_01) %>% as.character()  %>% as.integer())) %>%
+  left_join(LU.codes, by = "C_01") %>%
+  select(-VALUE) %>%
+  select(project_id, fieldsample_barcode,
+         latitude, longitude,
+         mfd_sampletype, mfd_areatype, mfd_hab1, mfd_hab2, mfd_hab3,
+         C_03, LU_summ)
+```
+
+### Concordance check
+```{r Concordance check, echo=F, message=F, warning=F, error=F, results='asis'}
+mfd_LU_ontology <- mfd_LU_ontology %>%
+  mutate(to_check = case_when(is.na(mfd_hab1) ~ "No",
+                              mfd_hab1 == "Biogas" ~ "No",
+                              mfd_hab1 == "Bogs, mires and fens" & (LU_summ == "Nature" | LU_summ == "Water" | LU_summ == "Agriculture_Nature") ~ "No",
+                              mfd_hab1 == "Coastal" & (LU_summ == "Nature" | LU_summ == "Water") ~ "No",
+                              mfd_hab1 == "Drinking water" ~ "No",
+                              mfd_hab1 == "Dunes" & (LU_summ == "Nature" | LU_summ == "Water") ~ "No",
+                              mfd_hab1 == "Dunes" & project_id %in% c("P01_1", "P08_1", "P08_5") ~ "No",
+                              mfd_hab1 == "Fields" & (LU_summ == "Agriculture" | LU_summ == "Agriculture_Nature") ~ "No",
+                              mfd_hab1 == "Forests" & (LU_summ == "Forest" | LU_summ == "Nature") ~ "No",
+                              mfd_hab1 == "Freshwater" & (LU_summ == "Water") ~ "No",
+                              mfd_hab1 == "Grassland formations" & (LU_summ == "Nature" | LU_summ == "Agriculture_Nature") ~ "No",
+                              mfd_hab1 == "Greenspaces" & (LU_summ == "Built_environment" | LU_summ == "Unmapped") ~ "No",
+                              mfd_hab1 == "Other" ~ "No",
+                              mfd_hab1 == "Roadside" & (LU_summ == "Built_environment" | LU_summ == "Unmapped") ~ "No",
+                              mfd_hab1 == "Rocky habitats and caves" ~ "No",
+                              mfd_hab1 == "Saltwater" & (LU_summ == "Water") ~ "No",
+                              mfd_hab1 == "Sclerophyllus scrub" & (LU_summ == "Nature" | LU_summ == "Agriculture_Nature") ~ "No",
+                              mfd_hab1 == "Temperate heath and scrub" & (LU_summ == "Nature" | LU_summ == "Agriculture_Nature") ~ "No",
+                              mfd_hab1 == "Urban" & (LU_summ == "Built_environment" | LU_summ == "Unmapped") ~ "No",
+                              mfd_hab1 == "Wastewater" ~ "No",
+                              mfd_hab2 == "Semi-natural tall-herb humid meadows" & (LU_summ == "Agriculture_Nature" | LU_summ == "Agriculture") ~ "No",
+                              mfd_hab2 == "Semi-natural dry grasslands" & (LU_summ == "Agriculture_Nature" | LU_summ == "Agriculture") ~ "No",
+                              mfd_hab2 == "Salt marshes and salt meadows" & (LU_summ == "Agriculture_Nature") ~ "No",
+                              mfd_hab3 == "Agricultural meadow (6430 subtype)" & (LU_summ == "Agriculture_Nature" | LU_summ == "Agriculture") ~ "No",
+                              .default = "Yes"))
+mfd_LU_ontology %>%
+  filter(to_check=="Yes")
+```
+
+### Adjacent cells check - queen
+
+#### Neighbour vect function
+```{r Neighbour vect function, echo=F, message=F, warning=F, error=F, results='asis'}
+get_neigbours <- function(raster, lon, lat, directions){
+  spat.vect <- vect(data.frame(lon = lon,
+                               lat = lat),
+                    geom = c("lon", "lat"))
+  cell.number <- cells(raster, spat.vect)[,2]
+  neighbouring.cells <- adjacent(raster, cell.number, directions = directions) %>% c()
+  neighbouring.values <- unlist(raster[neighbouring.cells])
+  return(neighbouring.values)
+}
+```
+
+#### Neighbourhood discordand cells
+```{r Neighbourhood discordand cells1, echo=F, message=F, warning=F, error=F, results='asis'}
+mfd_LU_ontology_neighbours1 <- mfd_LU_ontology %>%
+  filter(to_check=="Yes") %>%
+  rowwise() %>%
+  mutate(LU_neighbours1 = left_join(data.frame(C_01=as.integer(as.character(get_neigbours(LU.rast,
+                                                                                          lon = longitude,
+                                                                                          lat = latitude,
+                                                                                          "queen")))),
+                                    LU.codes) %>%
+           pull(LU_summ) %>% list())
+```
+
+#### Concordance check in neighbourhood
+```{r Concordance check in neighbourhood1, echo=F, message=F, warning=F, error=F, results='asis'}
+mfd_LU_ontology_neighbours1 <- mfd_LU_ontology_neighbours1 %>%
+  mutate(to_check_neighbours1 = case_when(mfd_hab1 == "Biogas" ~ "No",
+                                          mfd_hab1 == "Bogs, mires and fens" & ("Nature" %in% LU_neighbours1 | "Water" %in% LU_neighbours1 | "Agriculture_Nature" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Coastal" & ("Nature" %in% LU_neighbours1 | "Water" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Drinking water" ~ "No",
+                                          mfd_hab1 == "Dunes" & ("Nature" %in% LU_neighbours1 | "Water" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Fields" & ("Agriculture" %in% LU_neighbours1 | "Agriculture_Nature" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Forests" & ("Forest" %in% LU_neighbours1 | "Nature" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Freshwater" & ("Water" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Grassland formations" & ("Nature" %in% LU_neighbours1 | "Agriculture_Nature" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Greenspaces" & ("Built_environment" %in% LU_neighbours1 | "Unmapped" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Other" ~ "No",
+                                          mfd_hab1 == "Roadside" & ("Built_environment" %in% LU_neighbours1 | "Unmapped" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Rocky habitats and caves" ~ "No",
+                                          mfd_hab1 == "Saltwater" & ("Water" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Sclerophyllus scrub" & ("Nature" %in% LU_neighbours1 | "Agriculture_Nature" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Temperate heath and scrub" & ("Nature" %in% LU_neighbours1 | "Agriculture_Nature" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Urban" & ("Built_environment" %in% LU_neighbours1 | "Unmapped" %in% LU_neighbours1) ~ "No",
+                                          mfd_hab1 == "Wastewater" ~ "No",
+                                          mfd_hab3 == "Agricultural meadow (6430 subtype)" & ("Agriculture" %in% LU_neighbours1 | "Agriculture_Nature" %in% LU_neighbours1) ~ "No",
+                                          project_id %in% c("P05_1", "P05_2", "P16_4", "P18_2") & ("Built_environment" %in% LU_neighbours1 | "Unmapped" %in% LU_neighbours1) ~ "No",
+                                          .default = "Yes"))
+mfd_LU_ontology_neighbours1 %>%
+  filter(to_check_neighbours1=="Yes") %>% nrow()
+```
+
+## Adjacent cells check - knight
+
+### Neighbourhood discordand cells
+```{r Neighbourhood discordand cells2, echo=F, message=F, warning=F, error=F, results='asis'}
+mfd_LU_ontology_neighbours2 <- mfd_LU_ontology_neighbours1 %>%
+  filter(to_check_neighbours1=="Yes") %>%
+  rowwise() %>%
+  mutate(LU_neighbours2 = left_join(data.frame(C_01=as.integer(as.character(get_neigbours(LU.rast,
+                                                                                          lon = longitude,
+                                                                                          lat = latitude,
+                                                                                          "16")))),
+                                    LU.codes) %>%
+           pull(LU_summ) %>% list())
+```
+
+### Concordance check in neighbourhood
+```{r Concordance check in neighbourhood2, echo=F, message=F, warning=F, error=F, results='asis'}
+mfd_LU_ontology_neighbours2 <- mfd_LU_ontology_neighbours2 %>%
+  mutate(to_check_neighbours2 = case_when(mfd_hab1 == "Biogas" ~ "No",
+                                          mfd_hab1 == "Bogs, mires and fens" & ("Nature" %in% LU_neighbours2 | "Water" %in% LU_neighbours2 | "Agriculture_Nature" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Coastal" & ("Nature" %in% LU_neighbours2 | "Water" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Drinking water" ~ "No",
+                                          mfd_hab1 == "Dunes" & ("Nature" %in% LU_neighbours2 | "Water" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Fields" & ("Agriculture" %in% LU_neighbours2 | "Agriculture_Nature" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Forests" & ("Forest" %in% LU_neighbours2 | "Nature" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Freshwater" & ("Water" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Grassland formations" & ("Nature" %in% LU_neighbours2 | "Agriculture_Nature" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Greenspaces" & ("Built_environment" %in% LU_neighbours2 | "Unmapped" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Other" ~ "No",
+                                          mfd_hab1 == "Roadside" & ("Built_environment" %in% LU_neighbours2 | "Unmapped" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Rocky habitats and caves" ~ "No",
+                                          mfd_hab1 == "Saltwater" & ("Water" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Sandfilter" ~ "No",
+                                          mfd_hab1 == "Sclerophyllus scrub" & ("Nature" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Temperate heath and scrub" & ("Nature" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Urban" & ("Built_environment" %in% LU_neighbours2 | "Unmapped" %in% LU_neighbours2) ~ "No",
+                                          mfd_hab1 == "Wastewater" ~ "No",
+                                          mfd_hab3 == "Agricultural meadow (6430 subtype)" & ("Agriculture" %in% LU_neighbours2 | "Agriculture_Nature" %in% LU_neighbours2) ~ "No",
+                                          project_id %in% c("P05_1", "P05_2", "P16_4", "P18_2") & ("Built_environment" %in% LU_neighbours2 | "Unmapped" %in% LU_neighbours2) ~ "No",
+                                          project_id %in% c("P04_3", "P04_5", "P06_3") ~ "No", # Projects with confounded coordinates
+                                          .default = "Yes"))
+
+mfd_LU_ontology_neighbours3 <- mfd_LU_ontology_neighbours2 %>%
+  filter(to_check_neighbours2=="Yes") %>% arrange(desc(project_id))
+mfd_LU_ontology_neighbours2 %>%
+  filter(to_check_neighbours2=="Yes") %>% arrange(desc(project_id)) %>% nrow()
+```
+
+### Manual checks
+```{r Manual checks, echo=F, message=F, warning=F, error=F, results='asis'}
+mfd_LU_ontology_neighbours3 <- mfd_LU_ontology_neighbours3 %>%
+  mutate(to_check_neighbours3 = case_when(project_id %in% c("P05_1", "P05_2", "P16_4", "P18_2") & (LU_summ == "Built_environment" | LU_summ == "Unmapped") ~ "No",
+                              project_id == "P12_1" ~ "No", # Deep sediment in the sea (out of mapped area)
+                              mfd_areatype == "Subterranean" ~ "No", # Surface pixel is not relevant
+                              fieldsample_barcode %in% c("MFD13532", "MFD13531") ~ "No", # Spring/spingfen checked on Google maps
+                              project_id %in% c("P17_1") ~ "No", # Greenspaces double-checked in Google maps (MFD06900 and MFD06901 appear to be more natural than urban)
+                              fieldsample_barcode %in% c("MFD09779", "MFD09985", "MFD09987") ~ "Yes", # Water and sediment samples from nearby fjord but coords registered on land - hence wrong
+                              fieldsample_barcode == "MFD03535" ~ "Yes", # P11_1 - Sediment samples from nearby cost but coords registered on land
+                              project_id %in% c("P11_1") ~ "No", # Saltwater sediments double-checked in Google maps (MFD03536 is the only odd one of the series)
+                              fieldsample_barcode == "MFD03531" ~ "Yes", # P10_3 - Freshwater sediment from costal river but sample is on a street inland
+                              project_id %in% c("P10_3") ~ "No", # Freshwater sediments double-checked in Google maps (MFD03531 is the only odd one of the series)
+                              project_id %in% c("P10_1", "P10_2") ~ "No", # Running freshwater sediments from small streams, impossible to tell from Google Maps
+                              project_id %in% c("P09_1") ~ "No", # Standing freshwater sediments, some case are obviously right from Google Maps, other harder to tell - the source might not be there every year or with the same boundaries
+                              fieldsample_barcode %in% c("MFD10791", "MFD10907", "MFD10815", "MFD10771", "MFD10840") ~ "Yes", # Untouched forests samples that are not forests or in Norway
+                              project_id %in% c("P08_5") ~ "No", # The ambiguous samples were checked manually on Google Maps
+                              fieldsample_barcode %in% c("MFD03452") ~ "Yes", # Sample is not located in a natural habitat but on an agricultural field
+                              fieldsample_barcode %in% c("MFD00832", "MFD02840", "MFD02841", "MFD03699", "MFD03701", "MFD03702", "MFD03800") ~ "Yes", # P08_3 - Samples with locations not matching description from project P08_3
+                              project_id %in% c("P08_3") ~ "No", # Various samples checked on Google Maps, wrong placements above
+                              project_id %in% c("P08_2") ~ "No", # The ambiguous samples were checked manually on Google Maps
+                              fieldsample_barcode %in% c("MFD00263") ~ "Yes", # P01_1 - Samples should be a Molinia meadow but it is located in a field
+                              project_id %in% c("P01_1") ~ "No", # Various samples checked on Google Maps, wrong placements above
+                              fieldsample_barcode %in% c("MFD00449", "MFD00564") ~ "Yes", # P01_2 - Samples with locations not matching description from project P01_2 (instead they are fields, plantation)
+                              project_id %in% c("P01_2") ~ "No", # Various samples checked on Google Maps, wrong placements above
+                              project_id %in% c("P02_1") ~ "No", # Various samples checked on Google Maps, some samples have imprecise habitat
+                              project_id %in% c("P03_1") ~ "No", # Various samples checked on Google Maps, some samples have imprecise habitat
+                              project_id %in% c("P04_6") ~ "No", # Various samples checked on Google Maps
+                              fieldsample_barcode %in% c("MFD10082") ~ "Yes", # Samples with locations not matching description from project P04_7 (field mapping on a house)
+                              project_id %in% c("P04_8") ~ "No", # Various samples checked on Google Maps
+                              project_id %in% c("P05_1") ~ "No", # Standing freshwater sediments, some case are  hard to tell - the source might not be there every year or with the same boundaries
+                              fieldsample_barcode %in% c("MFD00594", "MFD00750", "MFD00863", "MFD01025", "MFD01053",
+                                                         "MFD01116", "MFD01118", "MFD01310", "MFD01470", "MFD02568",
+                                                         "MFD04531", "MFD09617") ~ "Yes", # P08_1 - Samples are located in impossible areas (e.g. in the middle of the sea or in Cameroon)
+                              project_id %in% c("P08_1") ~ "No", # Various samples checked on Google Maps, wrong placements above
+                                          .default = "Yes"))
+
+to_flag <- mfd_LU_ontology_neighbours3 %>%
+  filter(to_check_neighbours3=="Yes") %>% arrange(desc(project_id)) %>% pull(fieldsample_barcode)
+mfd_LU_ontology_neighbours3 %>%
+  filter(to_check_neighbours3=="Yes") %>% arrange(desc(project_id)) %>% nrow()
+```
+
+## Add coordinates reliability column
+
+```{r, warning=T, echo=eval_debug, eval=T}
+mfd_db <- mfd_db %>%
+  mutate(coords_reliable = if_else(fieldsample_barcode %in% to_flag, "No", coords_reliable))
 ```
 
 # General outputs
