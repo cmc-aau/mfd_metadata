@@ -262,7 +262,7 @@ mapping.project <- readxl::read_xlsx(paste0(metadata.path, "/", pid, "/MFDP005_m
   as.data.frame(paste0(metadata.path, "/", pid, "/P01_1_filled_table_TGF.xlsx"))
 
 filled.table1 <- read.xlsx(paste0(metadata.path, "/", pid, "/P01_1_filled_table_TGF.xlsx"), sheet = 1, detectDates = T) %>%
-                            mutate(correct_date = sampling_date) %>%
+                            mutate(correct_date =  ymd(sampling_date) %>% format("%Y-%m-%d")) %>%
   select(fieldsample_barcode, correct_date)
 
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
@@ -1076,7 +1076,7 @@ mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, r
 
 filled.table <- read.xlsx(paste0(metadata.path, "/", pid, "/P06_3_filled_table.xlsx"), sheet=1) %>%
   mutate(correct_habitat_typenumber = habitat_typenumber,
-         correct_date = sampling_date) %>%
+         correct_date = ymd(sampling_date) %>% format("%Y-%m-%d")) %>%
   select(fieldsample_barcode,
          correct_habitat_typenumber,
          correct_date)
@@ -1367,7 +1367,10 @@ filled.table <- readr::read_delim(file = paste0(metadata.path, "/", pid, "/23052
                                 delim = ";",
                                 col_names = T) %>%
   mutate(fieldsample_barcode = CORRECTED_barcode_fieldsample,
-         sampling_date = ymd_hms(sampling_date, truncated = 3) %>% format("%Y-%m-%d"),
+         #sampling_date = ymd_hms(sampling_date, truncated = 3) %>% format("%Y-%m-%d"),
+         sampling_date = if_else(str_length(sampling_date)>=20,
+                                 ymd_hms(sampling_date, truncated = 3) %>% format("%Y-%m-%d"),
+                                 dmy(sampling_date) %>% format("%Y-%m-%d")),
          correct_sampling_date = sampling_date,
          hab_code = as.character(hab_code),
          correct_habitat_typenumber = case_when(hab_code == "2" ~ NA,
@@ -1406,7 +1409,10 @@ filled.table1 <- (readr::read_delim(file = paste0(metadata.path, "/", pid, "/230
          sitename = NA,
          project_id = pid,
          received = NA))[,colnames(mfd_db)] %>%
-  add_ontology(ontology_path = ontology.path)
+  add_ontology(ontology_path = ontology.path) %>%
+  mutate(sampling_date = if_else(str_length(sampling_date)>=20,
+                                 ymd_hms(sampling_date, truncated = 3) %>% format("%Y-%m-%d"),
+                                 dmy(sampling_date) %>% format("%Y-%m-%d")))
 
 mfd_db <- mfd_db %>%
   filter(fieldsample_barcode!="MFD06328") %>%
@@ -2258,15 +2264,15 @@ filled.table <- (readxl::read_xlsx(paste0(metadata.path, "/", pid, "/P13_3_frde_
     separate(habitat_typenumber, into = c("to_delete1", "to_delete2", "habitat_typenumber")) %>%
     select(-to_delete1, -to_delete2) %>%
     mutate(latitude = as.numeric(latitude),
-           longitude = as.numeric(longitude)) %>%
+           longitude = as.numeric(longitude),
+           sampling_date = dmy(sampling_date) %>% format("%Y-%m-%d")) %>%
     select(-project_name))[,colnames(mfd_db)]
 
 mfd_db <- mfd_db %>%
   rbind(filled.table) %>%
   mutate(habitat_typenumber = ifelse((project_id == pid & habitat_typenumber == "2111"), "4100", habitat_typenumber),
          habitat_typenumber = ifelse((project_id == pid & habitat_typenumber == "2112"), "4200", habitat_typenumber),
-         habitat_typenumber = ifelse((project_id == pid & habitat_typenumber == "2119"), "4300", habitat_typenumber),
-         sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
+         habitat_typenumber = ifelse((project_id == pid & habitat_typenumber == "2119"), "4300", habitat_typenumber)) %>%
   #rbind(filled.table[!filled.table$fieldsample_barcode%in%mfd_db$fieldsample_barcode,colnames(mfd_db)]) %>%
   #filter(!(project_id==pid & grepl("negative control", sampling_comment))) %>%
   add_ontology(ontology_path = ontology.path)
@@ -2457,9 +2463,9 @@ metadata.project <- paste0(pid, "/", pid,  "_metadata_summary.csv")
 mfd_projects[mfd_projects$project_id == pid,] <- list(pid, pnm, des, ext, peo, res, com, metadata.project)
 
 mfd_db <- mfd_db %>%
-  mutate(mfd_areatype       = ifelse(project_id == pid, "Natural", mfd_areatype),
-         mfd_sampletype     = ifelse(project_id == pid, "Water", mfd_sampletype),
-         habitat_typenumber = ifelse(project_id == pid, "1110", habitat_typenumber),
+  mutate(mfd_areatype       = ifelse(project_id == pid, "Urban", mfd_areatype),
+         mfd_sampletype     = ifelse(project_id == pid, "Sediment", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid, "1299", habitat_typenumber),
          sampling_date      = if_else(project_id == pid, received, sampling_date)) %>%
   add_ontology(ontology_path = ontology.path)
 
@@ -2641,7 +2647,7 @@ filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P25_1_frde_
                                         habitat_typenumber == "9120" ~ "2300",
                                         .default = habitat_typenumber),
          correct_habitat_typenumber = as.character(habitat_typenumber),
-         correct_date = dmy(sampling_date)) %>%
+         correct_date = dmy(sampling_date) %>% format("%Y-%m-%d")) %>%
   select(fieldsample_barcode, correct_mfd_sampletype, correct_mfd_areatype, correct_habitat_typenumber, correct_date)
 
 mfd_db <- mfd_db %>%
@@ -2693,7 +2699,7 @@ mfd_db <- mfd_db %>%
 
 ```{r, warning=T, echo=eval_debug, eval=T}
 mfd_db <- mfd_db %>%
-  mutate(coords_reliable = if_else(project_id %in% c("P04_3", "P04_5", "P06_3"), "No", "Yes"))
+  mutate(coords_reliable = if_else(project_id %in% c("P04_3", "P04_5", "P06_3"), "Masked", "Yes"))
 ```
 
 ## Comparison with Basemap04
@@ -2707,15 +2713,15 @@ if(!file.exists(paste0(downloads.path,"/Basemap04_2021/lu_agg_2021.tif"))){
   unzip(paste0(downloads.path, "/Basemap04_public_geotiff.zip"), exdir = downloads.path)
 }
 
-#if(!file.exists(paste0(downloads.path,"/Basemap04_2021/lu_agg_2021_lonlat.tif"))){
-#  tmp.rast <- rast(paste0(downloads.path,"/Basemap04_2021/lu_agg_2021.tif"))  %>%
-#    project(crs(rast()))
-#  writeRaster(tmp.rast, paste0(downloads.path,"/Basemap04_2021/lu_agg_2021_lonlat.tif"),
-#              overwrite=T)
-#}
+if(!file.exists(paste0(downloads.path,"/Basemap04_2021/lu_agg_2021_lonlat.tif"))){
+  tmp.rast <- rast(paste0(downloads.path,"/Basemap04_2021/lu_agg_2021.tif"))  %>%
+    project(crs(rast()))
+  writeRaster(tmp.rast, paste0(downloads.path,"/Basemap04_2021/lu_agg_2021_lonlat.tif"),
+              overwrite=T)
+}
 
-LU.rast <- rast(paste0(downloads.path,"/Basemap04_2021/lu_agg_2021.tif")) %>%
-  project(crs(rast()))
+LU.rast <- rast(paste0(downloads.path,"/Basemap04_2021/lu_agg_2021_lonlat.tif"))
+
 LU.codes <- cats(LU.rast)[[1]] %>%
   mutate(LU_summ = case_when(VALUE >= 110000 & VALUE <= 160000 ~ "Built_environment",
                              VALUE >= 211000 & VALUE <= 230000 ~ "Agriculture",
@@ -2738,8 +2744,8 @@ sampling.locations <- vect(data.frame(lon = mfd_db$longitude, lat = mfd_db$latit
 ### Extract overlay
 ```{r Extract overlay, echo=F, message=F, warning=F, error=F, results='asis'}
 mfd_LU_ontology <- mfd_db %>%
-  mutate(C_01 = (extract(LU.rast, sampling.locations) %>% pull(C_01) %>% as.character()  %>% as.integer())) %>%
-  left_join(LU.codes, by = "C_01") %>%
+  mutate(C_02 = (extract(LU.rast, sampling.locations) %>% pull(C_02) %>% as.character())) %>% # C_02 is written in the tif instead of C_01
+  left_join(LU.codes, by = "C_02") %>%
   select(-VALUE) %>%
   select(project_id, fieldsample_barcode,
          latitude, longitude,
@@ -2891,7 +2897,7 @@ mfd_LU_ontology_neighbours3 <- mfd_LU_ontology_neighbours3 %>%
                               mfd_areatype == "Subterranean" ~ "No", # Surface pixel is not relevant
                               fieldsample_barcode %in% c("MFD13532", "MFD13531") ~ "No", # Spring/spingfen checked on Google maps
                               project_id %in% c("P17_1") ~ "No", # Greenspaces double-checked in Google maps (MFD06900 and MFD06901 appear to be more natural than urban)
-                              fieldsample_barcode %in% c("MFD09779", "MFD09985", "MFD09987") ~ "Yes", # Water and sediment samples from nearby fjord but coords registered on land - hence wrong
+                              #fieldsample_barcode %in% c("MFD09779", "MFD09985", "MFD09987") ~ "Yes", # Water and sediment samples from nearby fjord but coords registered on land - hence wrong. change for MfD2
                               fieldsample_barcode == "MFD03535" ~ "Yes", # P11_1 - Sediment samples from nearby cost but coords registered on land
                               project_id %in% c("P11_1") ~ "No", # Saltwater sediments double-checked in Google maps (MFD03536 is the only odd one of the series)
                               fieldsample_barcode == "MFD03531" ~ "Yes", # P10_3 - Freshwater sediment from costal river but sample is on a street inland
@@ -2917,6 +2923,13 @@ mfd_LU_ontology_neighbours3 <- mfd_LU_ontology_neighbours3 %>%
                               fieldsample_barcode %in% c("MFD00594", "MFD00750", "MFD00863", "MFD01025", "MFD01053",
                                                          "MFD01116", "MFD01118", "MFD01310", "MFD01470", "MFD02568",
                                                          "MFD04531", "MFD09617") ~ "Yes", # P08_1 - Samples are located in impossible areas (e.g. in the middle of the sea or in Cameroon)
+                              fieldsample_barcode %in% c("MFD03252", "MFD03253", "MFD03254", "MFD03255", "MFD03256",
+                                                         "MFD03257", "MFD03258", "MFD03259", "MFD03260", "MFD03261") ~ "No", # P18_1 - Samples from harbours
+                              project_id == "P05_2" ~ "No", # Leftover P05_2 urban freshwater bodies checked manually on Google Maps (change for mfd2)
+                              project_id == "P11_2" ~ "No", # Leftover P11_2 fjords checked manually on Google Maps (change for mfd2)
+                              project_id == "P11_3" ~ "No", # Leftover P11_3 fjords checked manually on Google Maps (change for mfd2)
+                              project_id == "P08_6" ~ "No", # Leftover P08_6 forests checked manually on Google Maps (change for mfd2)
+                              project_id == "P09_2" ~ "No", # Leftover P09_2 stanging freshwater bodies checked manually on Google Maps (change for mfd2)
                               project_id %in% c("P08_1") ~ "No", # Various samples checked on Google Maps, wrong placements above
                                           .default = "Yes"))
 
@@ -2931,6 +2944,14 @@ mfd_LU_ontology_neighbours3 %>%
 ```{r, warning=T, echo=eval_debug, eval=T}
 mfd_db <- mfd_db %>%
   mutate(coords_reliable = if_else(fieldsample_barcode %in% to_flag, "No", coords_reliable))
+```
+
+## Sitename whitespace removal
+
+```{r, warning=T, echo=eval_debug, eval=T}
+mfd_db <- mfd_db %>%
+  mutate(sitename = trimws(sitename, "l"),
+         sitename = trimws(sitename, "r"))
 ```
 
 # General outputs

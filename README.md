@@ -10,6 +10,9 @@ Many sources of samples contributed to the Microflora Danica collection. This wo
 Please note that the sample coordinates for projects P04_3, P04_5 and P06_3 are not reliable as noted in the column "coords_reliable" from the `<VERSION>_mfd_db.xlsx` file.
 The accuracy of the other coordantes was assessed with the concordance between the borad terms of the habitat ontology and the land usage annoration of Denmark as provided in [Basemap 04](https://pages.github.com/). Therefore, the samples that do not match any pixel in a 20m radius from the one corresponding to the sample were screened manually, leading to the labelling as unreliable of 32 extra samples.
 
+Release 2024-02-06_mfd_db.xlsx was used to generate the ncbi submission.
+
+
 
 The final structure uses a "mfd_project" table listing the subprojects with summary info (e.g. description, people involved, etc.) and links to the location of the per-subproject "mfd_subproject" tables. Those tables list all data tables linked to the subproject. There are three types of tables associated to each subproject:
 - main: info about the minimal metadata variables (in the mfd_report script this is governed by the variable "minimal_indices");
