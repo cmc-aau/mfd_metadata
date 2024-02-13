@@ -88,7 +88,7 @@ release_indices <- c("project_id",
                      "fieldsample_barcode", "sampling_date",
                      "latitude", "longitude", "habitat_typenumber", "sitename",
                      "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3",
-                     "coords_reliable") # NA is interpreted as all
+                     "coords_reliable", "cell.10km", "cell.1km") # NA is interpreted as all
 
 eval_debug <- params$debug
 eval_debug2 <- params$debug2
@@ -2156,8 +2156,9 @@ filled.table <- readxl::read_excel(paste0(metadata.path, "/", pid, "/P12_5_frde_
     mfd_sampletype = str_replace(mfd_sampletype, "^\\w{1}", toupper),
          mfd_areatype = str_replace(mfd_areatype, "^\\w{1}", toupper),
     received = NA,
-    longitude = as.numeric(longitude),
-    latitude = as.numeric(latitude)) %>%
+    longitude = if_else((project_id == pid & habitat_typenumber == "1211"), NA, as.numeric(longitude)),
+    latitude = if_else((project_id == pid & habitat_typenumber == "1211"), NA, as.numeric(latitude)),
+    habitat_typenumber = ifelse((project_id == pid & habitat_typenumber == "1211"), "1210",  habitat_typenumber)) %>%
   add_ontology(ontology_path = ontology.path)
 
 mfd_db <- mfd_db %>%
@@ -2781,8 +2782,8 @@ mfd_LU_ontology <- mfd_LU_ontology %>%
                               mfd_hab2 == "Salt marshes and salt meadows" & (LU_summ == "Agriculture_Nature") ~ "No",
                               mfd_hab3 == "Agricultural meadow (6430 subtype)" & (LU_summ == "Agriculture_Nature" | LU_summ == "Agriculture") ~ "No",
                               .default = "Yes"))
-mfd_LU_ontology %>%
-  filter(to_check=="Yes")
+#mfd_LU_ontology %>%
+#  filter(to_check=="Yes")
 ```
 
 ### Adjacent cells check - queen
@@ -2952,6 +2953,50 @@ mfd_db <- mfd_db %>%
 mfd_db <- mfd_db %>%
   mutate(sitename = trimws(sitename, "l"),
          sitename = trimws(sitename, "r"))
+```
+
+## Add reference grid mapping
+
+### Load grids
+
+```{r, warning=T, echo=eval_debug, eval=T}
+dk.1km <- vect(paste0(downloads.path, "/eea_v_3035_1_km_eea-ref-grid-dk_p_2013_v02_r00/dk_1km.shp")) %>%
+  project("+proj=longlat +datum=WGS84")
+dk.10km <- vect(paste0(downloads.path, "/eea_v_3035_10_km_eea-ref-grid-dk_p_2013_v02_r00/dk_10km.shp")) %>%
+  project("+proj=longlat +datum=WGS84")
+```
+
+### Make vector of sampling locations
+
+```{r, warning=T, echo=eval_debug, eval=T}
+sampling.locations <- vect(data.frame(lon = mfd_db$longitude,
+                                      lat = mfd_db$latitude,
+                                      fieldsample_barcode=mfd_db$fieldsample_barcode),
+                           geom = c("lon", "lat"))
+```
+
+### Get intersections with grid
+
+```{r, warning=T, echo=eval_debug, eval=T}
+intersect.1km <- intersect(sampling.locations, dk.1km) %>%
+  as.data.frame() %>%
+  mutate(cell.1km = CELLCODE) %>%
+  select(fieldsample_barcode, cell.1km)
+
+intersect.10km <- intersect(sampling.locations, dk.10km) %>%
+  as.data.frame() %>%
+  mutate(cell.10km = CELLCODE) %>%
+  select(fieldsample_barcode, cell.10km)
+```
+
+### Make new columns
+
+```{r, warning=T, echo=eval_debug, eval=T}
+mfd_db <- mfd_db %>%
+  left_join(intersect.1km,
+            by = "fieldsample_barcode") %>%
+  left_join(intersect.10km,
+            by = "fieldsample_barcode")
 ```
 
 # General outputs
