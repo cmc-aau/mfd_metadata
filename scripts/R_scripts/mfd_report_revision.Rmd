@@ -1,0 +1,449 @@
+---
+title: "MFD update metadata for revision"
+author: "F. Delogu"
+date: "as.Date(now())"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+    toc_collapsed: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+params:
+  debug: no
+  debug2: no
+  internal: yes
+  release: yes
+---
+
+<style type="text/css">
+body, td {
+   font-size: 10pt;
+   text-align: justify
+}
+code.r{
+  font-size: 8pt;
+}
+pre {
+  font-size: 8pt
+}
+</style>
+
+# Setup
+
+## Install libraries
+
+Installing libraries not included in the mamba environment.
+```{r install libraries, message=F, warning=F, echo=params$debug}
+if(!require("devtools")) install.packages("devtools")
+```
+
+## Load libraries
+```{r load libraries, message=F, warning=F, echo=params$debug}
+library(tidyverse)
+library(lubridate)
+library(openxlsx)
+library(knitr)
+
+options(stringsAsFactors = F,
+        width = 500,
+        gsubfn.engine = "R",
+        timeout = max(1000, getOption("timeout")))
+```
+
+## Set the environment
+```{r setup, echo=params$debug}
+options(stringsAsFactors = F, gsubfn.engine = "R")
+
+Sys.setenv("LANGUAGE"="En")
+
+wd <- getwd()
+
+ontology.path <- paste0(wd, '/../../data/ontology/2025-02-11_mfd-habitat-ontology.xlsx')
+downloads.path <- paste0(wd, '/../../data/downloads')
+metadata.path <- paste0(wd, '/../../data/metadata')
+
+mfd_projects.path <- paste0(wd, '/../../data/results/mfd_projects.xlsx')
+minimal_indices_explanation <- paste0(metadata.path, '/general/minimal_metadata_descriptors.xlsx')
+reformat.metadata.path <- paste0(wd, '/../../analysis/metadata')
+#mails_01.path <- paste0(wd, '/../../analysis/mails_01')
+
+releases.path <- paste0(wd, '/../../analysis/releases')
+
+#minimal_indices <- c("fieldsample_barcode", "sample_type", "sampling_date",
+#                     "latitude", "longitude",  "habitat_type", "habitat_typenumber", "sitename",
+#                     "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3") # NA is interpreted as all
+
+release_indices <- c("project_id",
+                     "fieldsample_barcode", "sampling_date",
+                     "latitude", "longitude", "habitat_typenumber", "sitename",
+                     "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3",
+                     "coords_reliable", "cell.10km", "cell.1km",
+                     "accession",
+                     "sampling_comment") # NA is interpreted as all
+
+
+sra_map <- read_tsv(paste0(metadata.path, "/general/2024-02-23_MFDID_NCBIbiosample_link.tsv")) %>%
+  `colnames<-`(c("fieldsample_barcode", "accession"))
+
+eval_debug <- params$debug
+eval_debug2 <- params$debug2
+eval_internal <- params$internal
+eval_release <- params$release
+```
+
+This section is meant for internal use and debugging, if you are interest in seeing the code please knit again the document setting the "debug" flag to "true". Optionally, set "debug2" as "true" to see also the code to generate the debug headings and text.
+
+For the generation of this document the parameters were set as:
+```{r print params, echo=eval_debug}
+data.frame(param=c("debug", "debug2", "internal", "release"), value=c(eval_debug, eval_debug2, eval_internal, eval_release)) %>%
+  kable()
+```
+
+### Load functions
+```{r load custom functions, message=F, warning=F, echo=eval_debug}
+source(paste0(wd, "/mfd_report_test_routine.R"))
+```
+
+## Load data
+
+### Load the metadata form the first submission
+```{r load metadata first submission, message=F, warning=F, error=F, echo=eval_debug}
+mfd_db <- read.xlsx(paste0(releases.path, "/2024-02-13_mfd_db.xlsx"))
+```
+
+# Subproject curation for second submission
+
+## P18_1
+```{r P18_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid = "P18_1"
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_sampletype     = ifelse(project_id == pid, "Other", mfd_sampletype)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+rm(pid)
+```
+## P18_2
+```{r P18_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid = "P18_2"
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_sampletype     = ifelse(project_id == pid, "Other", mfd_sampletype)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+rm(pid)
+```
+
+## P16_2
+```{r P16_2, echo=F, message=F, warning=F, error=F, results='asis'}
+pid = "P16_2"
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_sampletype     = ifelse(project_id == pid & mfd_hab3 == "sandfilter", "Other", mfd_sampletype)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+rm(pid)
+```
+
+## P16_3
+```{r P16_3, echo=F, message=F, warning=F, error=F, results='asis'}
+pid = "P16_3"
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_sampletype     = ifelse(project_id == pid &
+                                       mfd_hab3 == "sandfilter" &
+                                       !is.na(mfd_hab3),
+                                     "Other", mfd_sampletype)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+rm(pid)
+```
+
+## P20_1
+```{r P20_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid = "P20_1"
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_sampletype     = ifelse(project_id == pid &
+                                       mfd_sampletype == "Sediment",
+                                     "Other", mfd_sampletype),
+         mfd_hab2           = ifelse(project_id == pid &
+                                       mfd_sampletype == "Water",
+                                     "Leachate", mfd_sampletype),
+         habitat_typenumber = ifelse(project_id == pid &
+                                       mfd_sampletype == "Water",
+                                     "6100", habitat_typenumber),
+         habitat_typenumber = ifelse(project_id == pid &
+                                       mfd_sampletype == "Soil",
+                                     "5000", habitat_typenumber)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+rm(pid)
+```
+
+## P25_1
+```{r P25_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid = "P25_1"
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_sampletype     = if_else(project_id == pid &
+                                       mfd_sampletype == "Sediment",
+                                     "Other", mfd_sampletype),
+         habitat_typenumber = if_else(project_id == pid &
+                                       mfd_hab2 == "High salinity (saltworks)" &
+                                      !is.na(mfd_hab2),
+                                     "5200", habitat_typenumber),
+         habitat_typenumber = if_else(project_id == pid &
+                                       mfd_hab2 == "High chalk concentration (limestone quarry)" &
+                                      !is.na(mfd_hab2),
+                                     "5300", habitat_typenumber)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+rm(pid)
+```
+
+## P12_1
+```{r P12_1, echo=F, message=F, warning=F, error=F, results='asis'}
+pid = "P12_1"
+
+mfd_db <- mfd_db %>%
+  mutate(project_id     = if_else(project_id == pid &
+                                       year(sampling_date) == 2014,
+                                     "P12_2", project_id)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+rm(pid)
+```
+
+## P04_3
+```{r P04_3, echo=F, message=F, warning=F, error=F, results='asis'}
+pid = "P04_3"
+
+mfd_db <- mfd_db %>%
+  mutate(sampling_date     = case_when(project_id == pid & year(sampling_date) == 2020 ~ "2020-02-08",
+                                       project_id == pid & year(sampling_date) == 2021 ~ "2021-02-06",
+                                       .default = sampling_date)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+rm(pid)
+```
+
+## P04_6
+```{r P04_6, echo=F, message=F, warning=F, error=F, results='asis'}
+pid = "P04_6"
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_areatype     = if_else(project_id == pid, "Agriculture (reclaimed lowland)", mfd_areatype)) %>%
+  add_ontology(ontology_path = ontology.path)
+
+rm(pid)
+```
+
+## Incorporate comments from invidual tables
+```{r Incorporate comments, echo=F, message=F, warning=F, error=F, results='asis'}
+project_comments <- c("P10_2", # Stream speed, temperature and some chemicophysical properties (in Danish)
+                      "P11_3", # Environmental variables
+                      "P06_2", # Depth
+                      "P06_1", # Depth, condition (in Danish)
+                      "P11_2", # Condition
+                      "P12_1", # Depth
+                      "P12_2", # Depth
+                      "P12_3", # Depth
+                      "P13_1", # Capacity
+                      "P13_2", # Capacity
+                      "P16_2", # Depth
+                      "P06_3", # Depth
+                      "P09_3", # Depth
+                      "P09_4", # Depth
+                      "P12_5" # Depth
+                      )
+
+get_comments <- function(path_to_comments, pid){
+  X <- read.xlsx(paste0(path_to_comments, "/", pid, "/", pid, "_minimal_metadata.xlsx"))
+  to_print <- X %>% filter(project_id == pid) %>%
+    select(fieldsample_barcode, sampling_comment) %>%
+    mutate(sampling_comment = if_else(sampling_comment=="xml:space=\"preserve\"> ", NA, sampling_comment),
+           sampling_comment = as.character(sampling_comment)) %>%
+    rowwise() %>%
+    mutate(sampling_comment = if_else(grepl("xml:space=\"preserve\">", sampling_comment),
+                                      gsub("xml:space=\"preserve\">", "", sampling_comment), sampling_comment))
+  return(to_print)
+}
+
+mfd_comments <- lapply(project_comments,
+                       function (x) get_comments(reformat.metadata.path, x)) %>%
+  bind_rows()
+
+mfd_db <- mfd_db %>%
+  left_join(mfd_comments,
+            by = "fieldsample_barcode")
+```
+
+## Filter project descriptions only for retained projects
+```{r Filter project description, echo=F, message=F, warning=F, error=F, results='asis'}
+mfd_projects <- read.xlsx(paste0(releases.path, "/2024-02-13_mfd_projects.xlsx"))
+
+mfd_projects <- mfd_projects %>%
+  filter(project_id %in% unique((mfd_db %>% pull(project_id)))) %>%
+  select(-metadata_map)
+```
+
+## Add SRA accession identifiers
+```{r Add SRA id, echo=F, message=F, warning=F, error=F, results='asis'}
+mfd_db <- mfd_db %>%
+  left_join(sra_map,
+            by = "fieldsample_barcode")
+```
+
+# General outputs
+
+## Output checks
+
+This is the distribution of sample names in the curated metadata:
+
+### Sample duplication check
+```{r, warning=T, echo=eval_debug, eval=T}
+table(table(mfd_db$fieldsample_barcode))
+```
+
+### Retain samples with project numbers
+```{r, warning=T, echo=eval_debug, eval=T}
+mfd_db <- mfd_db %>%
+  filter(!is.na(project_id))
+```
+
+## Write output
+
+### Rearange mfd_db columns
+
+```{r, warning=T, echo=eval_debug, eval=T}
+mfd_db <- mfd_db[,release_indices]
+```
+
+### Formatting and printing function
+
+```{r, warning=T, echo=eval_debug, eval=T}
+print_meta <- function(data_table = NA, fname = NA, second_page = NA){
+  
+  if(file.exists(fname)){
+    file.remove(fname)
+  }
+  
+  data_table <- data_table %>%
+    mutate(across(everything(), ~if_else(.x=="", NA, .x)))
+  
+  wb <- openxlsx::createWorkbook()
+  
+  openxlsx::addWorksheet(wb, "variables")
+  header_style <- openxlsx::createStyle(textDecoration = "Bold")
+  openxlsx::writeData(wb, "variables", data_table, headerStyle = header_style)
+  
+  openxlsx::addWorksheet(wb, "description")
+  header_style <- openxlsx::createStyle(textDecoration = "Bold")
+  openxlsx::writeData(wb, "description", second_page, headerStyle = header_style)
+  
+  openxlsx::saveWorkbook(wb, fname)
+  
+}
+```
+
+## Second page definitions
+
+```{r, warning=T, echo=eval_debug, eval=T}
+second_page_projects <- data.frame(variable=c("project_id",
+                                               "project_name",
+                                               "description",
+                                               "extended_metadata",
+                                               "people",
+                                               "responsible",
+                                               "comment"),
+                                    description=c("Project identifier.",
+                                                  "Lay name of the project.",
+                                                  "Short description of the project.",
+                                                  "Content of the more infornationin the sampling_comment column of mfd_db.",
+                                                  "Research patner(s).",
+                                                  "Person responsible for the project.",
+                                                  "Comment to the project"))
+
+second_page_db <- data.frame(variable=c("project_id",
+                                        "fieldsample_barcode",
+                                        "sampling_date",
+                                        "latitude",
+                                        "longitude",
+                                        "habitat_typenumber",
+                                        "sitename",
+                                        "mfd_sampletype",
+                                        "mfd_areatype",
+                                        "mfd_hab1",
+                                        "mfd_hab2",
+                                        "mfd_hab3",
+                                        "coords_reliable",
+                                        "cell.10km",
+                                        "cell.1km",
+                                        "accession",
+                                        "sampling_comment"),
+                                    description=c("Project identifier.",
+                                        "MFD sample identifier.",
+                                        "Sampling Date.",
+                                        "Latitude.",
+                                        "Longitude.",
+                                        "Four digit code associated to the samples' habitats. It encodes mfd_hab1, mfd_hab2 and mfd_hab3 for any given combination of mfd_sampletype and mfd_areatype.",
+                                        "Lay name of the sampling site.",
+                                        "Sample type (level 1 of the MFD ontology.)",
+                                        "Area type (level 2 of the MFD ontology); it has to be used in combination with mfd_sampletype.",
+                                        "Descriptor 1 of the habitat (level 3 of the MFD ontology); it has to be used in combination with mfd_sampletype and mfd_areatype",
+                                        "Descriptor 2 of the habitat (level 4 of the MFD ontology); it has to be used in combination with mfd_sampletype, mfd_areatype and mfd_hab1.",
+                                        "Descriptor 3 of the habitat (level 5 of the MFD ontology); it has to be used in combination with mfd_sampletype, mfd_areatype, mfd_hab1 and mfd_hab2.",
+                                        "Note on the reliability od the coordinates: the possible values are Yes and No.",
+                                        "Cell code of the 10km reference grid of Denmark; used for subsampling if necessary.",
+                                        "Cell code of the 1km reference grid of Denmark; used for subsampling if necessary.",
+                                        "Accession identifier for the sample on the NCBI. If the accession identifier is not reported, there are not reads available for the sample.",
+                                        "Comment on the sample; it might contain other unprocessed data."))
+```
+
+### Write projects
+```{r, warning=T, echo=eval_debug, eval=T}
+print_meta(data_table = mfd_projects,
+           fname = paste0(reformat.metadata.path, "/mfd_projects_test.xlsx"),
+           second_page = second_page_projects)
+```
+
+### Write mfd db
+```{r, warning=T, echo=eval_debug, eval=T}
+print_meta(mfd_db,
+           fname = paste0(reformat.metadata.path, "/mfd_db_test.xlsx"),
+           second_page = second_page_db)
+```
+
+## Write releases
+
+### Write projects map
+```{r, warning=T, echo=eval_debug, eval=eval_release}
+print_meta(data_table = mfd_projects,
+           fname = paste0(releases.path, "/", Sys.Date(), "_mfd_projects.xlsx"),
+           second_page = second_page_projects)
+
+if(file.exists(paste0(releases.path, "/latest_mfd_projects.xlsx"))){
+  file.remove(paste0(releases.path, "/latest_mfd_projects.xlsx"))
+}
+print_meta(data_table = mfd_projects,
+           fname = paste0(releases.path, "/latest_mfd_projects.xlsx"),
+           second_page = second_page_projects)
+```
+
+### Write mfd db
+```{r, warning=T, echo=eval_debug, eval=eval_release}
+print_meta(data_table = mfd_db,
+           fname = paste0(releases.path, "/", Sys.Date(), "_mfd_db.xlsx"),
+           second_page = second_page_db)
+
+if(file.exists(paste0(releases.path, "/latest_mfd_db.xlsx"))){
+  file.remove(paste0(releases.path, "/latest_mfd_db.xlsx"))
+}
+print_meta(data_table = mfd_db,
+           fname = paste0(releases.path, "/latest_mfd_db.xlsx"),
+           second_page = second_page_db)
+```

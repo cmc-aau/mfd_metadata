@@ -81,15 +81,15 @@ add_ontology <- function(data = NA, ontology_path){
   
   mfd_hab1 <- mfd_ontology %>% 
     count(mfd_sampletype, mfd_areatype,mfd_hab1_code, mfd_hab1) %>%
-    mutate(mfd_h1u = paste0(mfd_sampletype, mfd_areatype,mfd_hab1_code))
+    mutate(mfd_h1u = paste0(mfd_sampletype, mfd_areatype, mfd_hab1_code))
   
   mfd_hab2 <- mfd_ontology %>% 
     count(mfd_sampletype, mfd_areatype,mfd_hab2_code, mfd_hab2) %>%
-    mutate(mfd_h2u = paste0(mfd_sampletype, mfd_areatype,mfd_hab2_code))
+    mutate(mfd_h2u = paste0(mfd_sampletype, mfd_areatype, mfd_hab2_code))
   
   mfd_hab3 <- mfd_ontology %>% 
     count(mfd_sampletype, mfd_areatype,mfd_hab3_code, mfd_hab3) %>%
-    mutate(mfd_h3u = paste0(mfd_sampletype, mfd_areatype,mfd_hab3_code))
+    mutate(mfd_h3u = paste0(mfd_sampletype, mfd_areatype, mfd_hab3_code))
   
   test2 <- test1 %>% left_join(mfd_hab1 %>% select(mfd_h1u, mfd_hab1), by = "mfd_h1u") %>%
     left_join(mfd_hab2 %>% select(mfd_h2u, mfd_hab2), by = "mfd_h2u") %>%

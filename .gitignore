@@ -1,6 +1,8 @@
 # To be ignored
 #data/metadata/*/*
 scripts/R_scripts/mfd_report.html
+scripts/R_scripts/mfd_report_revision.html
+scripts/R_scripts/mfd_releases_comparison.html
 scripts/R_scripts/.Rhistory
 analysis/*/*/.~lock*
 analysis/mails_01/*
