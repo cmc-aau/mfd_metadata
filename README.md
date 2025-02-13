@@ -18,7 +18,7 @@ The original server used to store the MFD barcode data is not accessible anymore
 
 ![alt_text](/analysis/releases/entires_time.png)
 
-## Repo strucutre (relevant subset)
+## Repo structure (relevant subset)
 
 | Folder | Content |
 | --- | --- |
