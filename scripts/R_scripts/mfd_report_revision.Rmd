@@ -242,6 +242,21 @@ mfd_db <- mfd_db %>%
 rm(pid)
 ```
 
+## P13_3
+```{r P13_3, echo=F, message=F, warning=F, error=F, results='asis'}
+pid = "P13_3"
+
+mfd_db <- mfd_db %>%
+  mutate(mfd_sampletype         = if_else(project_id == pid, "Other", mfd_sampletype),
+    habitat_typenumber          = case_when(project_id == pid & habitat_typenumber == "4100" ~ "6100",
+                                            project_id == pid & habitat_typenumber == "4200" ~ "6200",
+                                            project_id == pid & habitat_typenumber == "4300" ~ "6300",
+                                            .default = habitat_typenumber)) %>%
+  add_ontology(ontology_path    = ontology.path)
+
+rm(pid)
+```
+
 ## Incorporate comments from invidual tables
 ```{r Incorporate comments, echo=F, message=F, warning=F, error=F, results='asis'}
 project_comments <- c("P10_2", # Stream speed, temperature and some chemicophysical properties (in Danish)
