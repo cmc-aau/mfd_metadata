@@ -7,6 +7,7 @@ scripts/R_scripts/.Rhistory
 analysis/*/*/.~lock*
 analysis/mails_01/*
 data/downloads/*
+analysis/metadata/*_test.xlsx
 
 # To include
 !data/metadata/ontology/2022-11-28_mfd-habitat-ontology.xlsx

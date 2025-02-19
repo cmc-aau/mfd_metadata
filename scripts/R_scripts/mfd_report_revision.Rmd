@@ -121,17 +121,18 @@ mfd_db <- read.xlsx(paste0(releases.path, "/2024-02-13_mfd_db.xlsx"))
 pid = "P18_1"
 
 mfd_db <- mfd_db %>%
-  mutate(mfd_sampletype     = ifelse(project_id == pid, "Other", mfd_sampletype)) %>%
+  mutate(mfd_sampletype      = ifelse(project_id == pid, "Other", mfd_sampletype)) %>%
   add_ontology(ontology_path = ontology.path)
 
 rm(pid)
 ```
+
 ## P18_2
 ```{r P18_2, echo=F, message=F, warning=F, error=F, results='asis'}
 pid = "P18_2"
 
 mfd_db <- mfd_db %>%
-  mutate(mfd_sampletype     = ifelse(project_id == pid, "Other", mfd_sampletype)) %>%
+  mutate(mfd_sampletype      = ifelse(project_id == pid, "Other", mfd_sampletype)) %>%
   add_ontology(ontology_path = ontology.path)
 
 rm(pid)
@@ -142,7 +143,7 @@ rm(pid)
 pid = "P16_2"
 
 mfd_db <- mfd_db %>%
-  mutate(mfd_sampletype     = ifelse(project_id == pid & mfd_hab3 == "sandfilter", "Other", mfd_sampletype)) %>%
+  mutate(mfd_sampletype      = ifelse(project_id == pid & mfd_hab3 == "Sandfilter", "Other", mfd_sampletype)) %>%
   add_ontology(ontology_path = ontology.path)
 
 rm(pid)
@@ -154,7 +155,7 @@ pid = "P16_3"
 
 mfd_db <- mfd_db %>%
   mutate(mfd_sampletype     = ifelse(project_id == pid &
-                                       mfd_hab3 == "sandfilter" &
+                                       mfd_hab3 == "Sandfilter" &
                                        !is.na(mfd_hab3),
                                      "Other", mfd_sampletype)) %>%
   add_ontology(ontology_path = ontology.path)
@@ -212,7 +213,7 @@ pid = "P12_1"
 mfd_db <- mfd_db %>%
   mutate(project_id     = if_else(project_id == pid &
                                        year(sampling_date) == 2014,
-                                     "P12_2", project_id)) %>%
+                                  "P12_2", project_id)) %>%
   add_ontology(ontology_path = ontology.path)
 
 rm(pid)
@@ -236,7 +237,7 @@ rm(pid)
 pid = "P04_6"
 
 mfd_db <- mfd_db %>%
-  mutate(mfd_areatype     = if_else(project_id == pid, "Agriculture (reclaimed lowland)", mfd_areatype)) %>%
+  mutate(mfd_areatype        = if_else(project_id == pid, "Agriculture (reclaimed lowland)", mfd_areatype)) %>%
   add_ontology(ontology_path = ontology.path)
 
 rm(pid)
