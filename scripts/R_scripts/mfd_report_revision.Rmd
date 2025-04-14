@@ -68,25 +68,21 @@ metadata.path <- paste0(wd, '/../../data/metadata')
 mfd_projects.path <- paste0(wd, '/../../data/results/mfd_projects.xlsx')
 minimal_indices_explanation <- paste0(metadata.path, '/general/minimal_metadata_descriptors.xlsx')
 reformat.metadata.path <- paste0(wd, '/../../analysis/metadata')
-#mails_01.path <- paste0(wd, '/../../analysis/mails_01')
 
 releases.path <- paste0(wd, '/../../analysis/releases')
-
-#minimal_indices <- c("fieldsample_barcode", "sample_type", "sampling_date",
-#                     "latitude", "longitude",  "habitat_type", "habitat_typenumber", "sitename",
-#                     "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3") # NA is interpreted as all
 
 release_indices <- c("project_id",
                      "fieldsample_barcode", "sampling_date",
                      "latitude", "longitude", "habitat_typenumber", "sitename",
                      "mfd_sampletype", "mfd_areatype", "mfd_hab1", "mfd_hab2", "mfd_hab3",
                      "coords_reliable", "cell.10km", "cell.1km",
-                     "accession",
+                     "BioProject", "BioSample",
+                     "Metagenome", "Metagenome_assembly",
+                     "EUK_operon", "BAC_operon", "UMI_16SrRNA",
                      "sampling_comment") # NA is interpreted as all
 
 
-sra_map <- read_tsv(paste0(metadata.path, "/general/2024-02-23_MFDID_NCBIbiosample_link.tsv")) %>%
-  `colnames<-`(c("fieldsample_barcode", "accession"))
+sra_map <- read_tsv(paste0(metadata.path, "/general/2025-04-14_MFD_NCBI_meta 1.tsv"), col_names = T)
 
 eval_debug <- params$debug
 eval_debug2 <- params$debug2
@@ -258,6 +254,12 @@ mfd_db <- mfd_db %>%
 rm(pid)
 ```
 
+## Extra samples
+```{r Extra samples, echo=F, message=F, warning=F, error=F, results='asis'}
+mfd_db <- mfd_db %>%
+  add_row(project_id = "P11_2", fieldsample_barcode = "MFD10339", habitat_typenumber = "1000", mfd_sampletype = "Sediment", mfd_areatype = "Natural", mfd_hab1 = "Saltwater", coords_reliable = "Yes")
+```
+
 ## Incorporate comments from invidual tables
 ```{r Incorporate comments, echo=F, message=F, warning=F, error=F, results='asis'}
 project_comments <- c("P10_2", # Stream speed, temperature and some chemicophysical properties (in Danish)
@@ -399,7 +401,13 @@ second_page_db <- data.frame(variable=c("project_id",
                                         "coords_reliable",
                                         "cell.10km",
                                         "cell.1km",
-                                        "accession",
+                                        "BioProject",
+                                        "BioSample",
+                                        "Metagenome",
+                                        "Metagenome_assembly",
+                                        "EUK_operon",
+                                        "BAC_operon",
+                                        "UMI_16SrRNA",
                                         "sampling_comment"),
                                     description=c("Project identifier.",
                                         "MFD sample identifier.",
@@ -416,7 +424,13 @@ second_page_db <- data.frame(variable=c("project_id",
                                         "Note on the reliability od the coordinates: the possible values are Yes and No.",
                                         "Cell code of the 10km reference grid of Denmark; used for subsampling if necessary.",
                                         "Cell code of the 1km reference grid of Denmark; used for subsampling if necessary.",
-                                        "Accession identifier for the sample on the NCBI. If the accession identifier is not reported, there are not reads available for the sample.",
+                                        "Accession identifier for the BioProject on NCBI.",
+                                        "Accession identifier for the BioSample on NCBI.",
+                                        "Accession identifier for the Metagenome on SRA. If the accession identifier is not reported, there are not data of this type for the sample.",
+                                        "Accession identifier for the metagenome assembly on Zenodo https://zenodo.org/records/12605769.",
+                                        "Accession identifier for the Eukaryotic Operon amplicons on SRA. If the accession identifier is not reported, there are not data of this type for the sample.",
+                                        "Accession identifier for the Bacterial Operon amplicons on SRA. If the accession identifier is not reported, there are not data of this type for the sample.",
+                                        "Accession identifier for the 16S rRNA UMI sequences on SRA. If the accession identifier is not reported, there are not data of this type for the sample.",
                                         "Comment on the sample; it might contain other unprocessed data."))
 ```
 
