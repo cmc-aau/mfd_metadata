@@ -3,9 +3,8 @@
 ## Intro
 Many sources of samples contributed to the Microflora Danica collection. This work orgnises the received metadata from the various subprojects in a standardised way and prepares the (semi-)automated request for the missing information.
 
-**Latest release of the MfD ontology: `data/ontology/latest_mfd-habitat-ontology.xlsx`**  
-**Latest release of the MfD field metadata: `analysis/releases/latest_mfd_db.xlsx`**  
-**Latest release of the MfD technical metadata: `data/metadata/general/latest_corrected_combined_metadata.csv`**  
+Links to the latest releases of the [**MFD ontology**](data/ontology/latest_mfd-habitat-ontology.xlsx) and [**MFD field and technical metadata**](analysis/releases/latest_mfd_db.xlsx). 
+
 
 Please note that the sample coordinates for projects P04_3, P04_5 and P06_3 are not reliable as noted in the column "coords_reliable" from the `<VERSION>_mfd_db.xlsx` file.
 The accuracy of the other coordinates was assessed with the concordance between the broad terms of the habitat ontology and the land usage annotation of Denmark as provided in [Basemap 04](https://pages.github.com/). Therefore, the samples that do not match any pixel in a 20m radius from the one corresponding to the sample were screened manually, leading to the labelling as unreliable of 32 extra samples.
