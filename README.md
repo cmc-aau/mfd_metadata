@@ -19,27 +19,28 @@ The original server used to store the MFD barcode data is not accessible anymore
 
 ## Repo structure (relevant subset)
 
-| Folder | Content |
-| --- | --- |
-| ├── analysis/                                          | Results of the analysis |
-| │   └── releases/                                      | Folder with the stable releases of the MFD metadata|
-| │       └── \<DATE\>_mfd_db.xlsx                       | Date-stamped releases of the MFD metadata |
-| ├── data/                                              | Data used to generate the results |
-| │   └─── metadata/                                     | Metadata of the project |
-| │       └── general/                                   | Metadata applying to whole MFD project |
-| │           └── latest_corrected_combined_metadata.csv | Technical metadata table |
-| │       └── ontology/                                  | Metadata applying to whole MFD project |
-| │           └── \<DATE\>mfd-habitat-ontology.xlsx      | Date-stamped releases of the habitat ontology |
-| ├── envs/                                              | Computing environments |
-| │       └── mfd_metadata_R.yml                         | Environment with the packages needed to reproduce the analysis |
-| └── scripts/                                           | Scripts used to analyse the data |
-|         └── R_scripts/                                 | R scripts |
-|             ├── mfd_report.Rmd                         | Main notebook that generates all the results |
-|             ├── mfd_report_revision.Rmd                | Notebook that amends results for the paper revision |
-|             ├── subroject_template.Rmd                 | Per-project R Markdown template |
-|             ├── mfd_report_test_routine.R              | I/O and text printing functions for the template |
-|             ├── coords_functions.R                     | Functions to work on the coordinates in the template |
-|             └── ooe_functions.R                        | Functions to work on the out-of-expectation entries in the template |
+| Folder / File | Content |
+| :--- | :--- |
+| ├── **analysis/** | Results of the analysis |
+| │&nbsp;&nbsp; └── **releases/** | Folder with the stable releases of the MFD metadata |
+| │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; └── \<DATE\>_mfd_db.xlsx | Date-stamped releases of the MFD metadata |
+| ├── **data/** | Data used to generate the results |
+| │&nbsp;&nbsp; ├── **metadata/** | Metadata of the project |
+| │&nbsp;&nbsp; │&nbsp;&nbsp; ├── **general/** | Metadata applying to whole MFD project |
+| │&nbsp;&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; └── latest_corrected_combined_metadata.csv | Technical metadata table |
+| │&nbsp;&nbsp; │&nbsp;&nbsp; └── **genome_accessions/** | Mapping of internal IDs with ENA/NCBI genome accessions |
+| │&nbsp;&nbsp; └── **ontology/** | Metadata applying to whole MFD project |
+| │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; └── \<DATE\>mfd-habitat-ontology.xlsx | Date-stamped releases of the habitat ontology |
+| ├── **envs/** | Computing environments |
+| │&nbsp;&nbsp; └── mfd_metadata_R.yml | Environment with the packages needed to reproduce the analysis |
+| └── **scripts/** | Scripts used to analyse the data |
+| &nbsp;&nbsp;&nbsp;&nbsp; └── **R_scripts/** | R scripts |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ├── mfd_report.Rmd | Main notebook that generates all the results |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ├── mfd_report_revision.Rmd | Notebook that amends results for the paper revision |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ├── subroject_template.Rmd | Per-project R Markdown template |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ├── mfd_report_test_routine.R | I/O and text printing functions for the template |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ├── coords_functions.R | Functions to work on the coordinates in the template |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; └── ooe_functions.R | Functions to work on the out-of-expectation entries in the template |
 
 ## Workflow
 
